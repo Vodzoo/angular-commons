@@ -41,6 +41,13 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
   public initialValue?: FormValue<T, UserTypes> | null;
   public initialDisabledState?: FormDisabledState<T, UserTypes> | null;
   public initialValidators?: FormValidators<T, UserTypes> | null;
+  /**
+   * for internal use only
+   */
+  public readonly recalculateMethods: Array<(service?: FormService<any, any>) => void> = [];
+  public readonly recalculateConfig = () => {
+    this.recalculateMethods.forEach(method => method());
+  };
   protected saveInStorage: boolean = true;
   protected removeFromStorageOnDestroy: boolean = true;
   private formValues: Map<string, FormValues<T, UserTypes>> = new Map();
@@ -61,6 +68,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
     if (this.removeFromStorageOnDestroy) {
       [...this.formValues.keys()].forEach(key => this.storage.removeItem(key));
     }
+    this.recalculateMethods.length = 0;
   }
 
 
@@ -183,18 +191,6 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
   ): void {
     markAsUiChange(formArray);
     formArray.removeAt(formArray.controls.indexOf(formGroup));
-  }
-
-
-  protected createFormArrayControl<R>(
-    formControl: (initialValue?: R | null, initialDisabledState?: boolean | null, initialValidators?: ValidatorFunctions) => FormControl<R | null>,
-    initialValue?: (R | null)[],
-    initialDisabledState?: (boolean | null)[],
-    initialValidators?: ValidatorFunctions[],
-    initialSize: number = 1
-  ): FormArray<FormControl<R | null>> {
-    formControl = formControl.bind(this);
-    return this.fb.array([...(initialValue ?? new Array(initialSize).fill(null)).map((value, index) => formControl(value, !!initialDisabledState?.[index], initialValidators?.[index]))]);
   }
 
 
