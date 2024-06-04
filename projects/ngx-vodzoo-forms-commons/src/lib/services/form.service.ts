@@ -126,6 +126,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
     initialValue?: FormValue<T, UserTypes> | null,
     initialDisabledState?: FormDisabledState<T, UserTypes> | null,
     initialValidators?: FormValidators<T, UserTypes> | null,
+    index?: number | null
   ): FormGroup<T> {
     const hasInitialValue: boolean = !!initialValue || !!this.initialValue;
     const hasInitialDisableState: boolean = !!initialDisabledState || !!this.initialDisabledState;
@@ -133,7 +134,8 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
     return this.fromGroupConfig(
       hasInitialValue ? {...this.initialValue, ...initialValue} : undefined,
       hasInitialDisableState ? {...this.initialDisabledState, ...initialDisabledState} : undefined,
-      hasInitialValidators ? {...this.initialValidators, ...initialValidators} : undefined
+      hasInitialValidators ? {...this.initialValidators, ...initialValidators} : undefined,
+      index
     );
   }
 
@@ -146,6 +148,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
     initialValue?: FormValue<T, UserTypes> | null,
     initialDisabledState?: FormDisabledState<T, UserTypes> | null,
     initialValidators?: FormValidators<T, UserTypes> | null,
+    index?: number | null
   ): FormGroup<T> {
     throw new Error('From group config not implemented!');
   }

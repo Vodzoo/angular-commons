@@ -365,16 +365,20 @@ type Value<T, UserTypes> = T extends AllowedTypes<UserTypes> ? T : RecursivePart
 
 type RecursivePartialBoolean<T, UserTypes> = {
   [P in keyof T]?:
-    T[P] extends Array<infer U> ? Array<ValueBoolean<U, UserTypes>> : ValueBoolean<T[P], UserTypes>;
+    T[P] extends Array<infer U> ? ArrayValueBoolean<U, UserTypes> : ValueBoolean<T[P], UserTypes>;
 };
-type ValueBoolean<T, UserTypes> = T extends AllowedTypes<UserTypes> ? boolean : RecursivePartialBoolean<T, UserTypes>;
+type ArrayValueBoolean<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueBooleanFn : RecursivePartialBoolean<T, UserTypes>;
+type ValueBoolean<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueBooleanFn : RecursivePartialBoolean<T, UserTypes>;
+export type ValueBooleanFn = (index?: number | null) => boolean;
 
 
 type RecursivePartialValidators<T, UserTypes> = {
   [P in keyof T]?:
-    T[P] extends Array<infer U> ? Array<ValueValidator<U, UserTypes>> : ValueValidator<T[P], UserTypes>;
+    T[P] extends Array<infer U> ? ArrayValueValidator<U, UserTypes> : ValueValidator<T[P], UserTypes>;
 };
-type ValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValidatorFunctions : RecursivePartialValidators<T, UserTypes>;
+type ArrayValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueValidatorFn : RecursivePartialValidators<T, UserTypes>;
+type ValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueValidatorFn : RecursivePartialValidators<T, UserTypes>;
+export type ValueValidatorFn = (index?: number | null) => ValidatorFunctions;
 
 
 /**
