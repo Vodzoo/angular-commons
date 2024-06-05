@@ -50,7 +50,7 @@ export interface FormConfig {
   exportAs: 'vodzooForm',
   standalone: true
 })
-export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserTypes> implements OnInit {
+export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnInit {
   /**
    * ------------------------------------
    * Injected services
@@ -58,7 +58,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserTy
    * @private
    */
   private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
-  private formService: FormService<T, UserTypes> = inject(FormService<T, UserTypes>);
+  private formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
   private formEventService: FormEventService = inject(FormEventService);
   private elementRef: ElementRef = inject(ElementRef);
   private destroyRef: DestroyRef = inject(DestroyRef);
@@ -399,7 +399,7 @@ export interface StatusChanges {
 
 
 
-export interface Form<T extends { [K in keyof T]: AbstractControl }, UserTypes> {
+export interface Form<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
   /**
    * @Component({
    *   ...
@@ -413,7 +413,7 @@ export interface Form<T extends { [K in keyof T]: AbstractControl }, UserTypes> 
    *
    *   formDirective = inject(FormDirective);
    */
-  formDirective: FormDirective<T, UserTypes>;
+  formDirective: FormDirective<T, UserConfig, UserTypes>;
   getFormValue?: () => FormValues<T, UserTypes>;
   addValidators?: (
     control: AbstractControl,
@@ -432,7 +432,7 @@ export interface Form<T extends { [K in keyof T]: AbstractControl }, UserTypes> 
  * Functions
  * ------------------------------------
  */
-export function formProviders<T extends Type<FormService<any, any>>>(service: T): Provider {
+export function formProviders<T extends Type<FormService<any, any, any>>>(service: T): Provider {
   return {
     provide: FormService,
     useExisting: service

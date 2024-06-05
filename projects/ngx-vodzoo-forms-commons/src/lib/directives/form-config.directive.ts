@@ -9,7 +9,7 @@ import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 export const RECALCULATE_CONFIG: InjectionToken<readonly RecalculateConfig[]> = new InjectionToken<readonly RecalculateConfig[]>('RECALCULATE_CONFIG');
 
 export interface RecalculateConfig {
-  registerRecalculate(fn: (service?: FormService<any, any>) => void): void;
+  registerRecalculate(fn: (service?: FormService<any, any, any>) => void): void;
 }
 
 @Directive({
@@ -17,15 +17,15 @@ export interface RecalculateConfig {
   exportAs: 'vodzooFormConfig',
   standalone: true
 })
-export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, UserTypes> implements OnInit, OnDestroy {
+export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnInit, OnDestroy {
   /**
    * ------------------------------------
    * Injected services
    * ------------------------------------
    * @private
    */
-  private formService: FormService<T, UserTypes> = inject(FormService<T, UserTypes>);
-  private formDirective: FormDirective<T, UserTypes> = inject(FormDirective<T, UserTypes>);
+  private formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
+  private formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
   private destroyRef: DestroyRef = inject(DestroyRef);
 
   constructor() {
@@ -39,13 +39,13 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Fields
    * ------------------------------------
    */
-  private _defaultFormFieldsConfig: FormControlsConfig<T, UserTypes> = this.formService.getFormFieldsConfig();
-  private _formControlsConfig: FormControlsConfig<T, UserTypes> = this._defaultFormFieldsConfig;
-  private _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
-  private _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserTypes>>(this._formControlsConfig);
-  public readonly controlsConfig: Observable<FormControlsConfig<T, UserTypes>> = this._controlsConfig$.asObservable();
-  public readonly controlsConfigChange: Observable<FormControlsConfigChange<T, UserTypes>> = this._formControlsConfigChange$.asObservable();
-  public readonly recalculateConfig = (service?: FormService<any, any>) => {
+  private _defaultFormFieldsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.formService.getFormFieldsConfig();
+  private _formControlsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this._defaultFormFieldsConfig;
+  private _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
+  private _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
+  public readonly controlsConfig: Observable<FormControlsConfig<T, UserConfig, UserTypes>> = this._controlsConfig$.asObservable();
+  public readonly controlsConfigChange: Observable<FormControlsConfigChange<T, UserConfig, UserTypes>> = this._formControlsConfigChange$.asObservable();
+  public readonly recalculateConfig = (service?: FormService<any, any, any>) => {
     if (service && service !== this.formService) {
       return;
     }
@@ -62,7 +62,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    */
   @Input()
-  public set formControlsConfig(value: FormControlsConfig<T, UserTypes> | undefined) {
+  public set formControlsConfig(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined) {
     this._formControlsConfig = !value || Object.keys(value).length === 0 ? this._defaultFormFieldsConfig : value;
     this.setConfig(this._formControlsConfig);
     this.setConfigChange(this.mapConfigToChange(value));
@@ -76,11 +76,11 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Getters
    * ------------------------------------
    */
-  public get controlsConfigChangeValue(): FormControlsConfigChange<T, UserTypes> {
+  public get controlsConfigChangeValue(): FormControlsConfigChange<T, UserConfig, UserTypes> {
     return this._formControlsConfigChange$.value;
   }
 
-  public get controlsConfigValue(): FormControlsConfig<T, UserTypes> {
+  public get controlsConfigValue(): FormControlsConfig<T, UserConfig, UserTypes> {
     return this._controlsConfig$.value;
   }
 
@@ -116,9 +116,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Other methods
    * ------------------------------------
    */
-  private mapConfigToChange(value: FormControlsConfig<T, UserTypes> | undefined): FormControlsConfigChange<T, UserTypes> {
-    const mergedConfig: FormControlsConfig<T, UserTypes> = {...this._defaultFormFieldsConfig, ...value};
-    const change: FormControlsConfigChange<T, UserTypes> = {};
+  private mapConfigToChange(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined): FormControlsConfigChange<T, UserConfig, UserTypes> {
+    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {...this._defaultFormFieldsConfig, ...value};
+    const change: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
     Object.keys(mergedConfig).forEach((key: string) => {
       if ((typeof (mergedConfig as any)[key]) === 'function') {
         (change as any)[key] = ((mergedConfig as any)[key] as FormFieldConfigFn<T, any>)(this.formDirective.form, this.formDirective.formIndex);
@@ -127,11 +127,11 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     return change;
   }
 
-  private setConfigChange(value: FormControlsConfigChange<T, UserTypes>): void {
+  private setConfigChange(value: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
     this._formControlsConfigChange$.next(value);
   }
 
-  private setConfig(value: FormControlsConfig<T, UserTypes>): void {
+  private setConfig(value: FormControlsConfig<T, UserConfig, UserTypes>): void {
     this._controlsConfig$.next(value);
   }
 }
@@ -144,21 +144,21 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
  * Types
  * ------------------------------------
  */
-export type FormControlsConfig<T, UserTypes> = RecursivePartialFormFieldConfig<FormRawValue<T>, UserTypes>;
+export type FormControlsConfig<T, UserConfig, UserTypes> = RecursivePartialFormFieldConfig<FormRawValue<T>, UserConfig, UserTypes>;
 type AllowedTypes<UserTypes> = boolean | string | number | undefined | null | UserTypes;
-type RecursivePartialFormFieldConfig<T, UserTypes> = {
+type RecursivePartialFormFieldConfig<T, UserConfig, UserTypes> = {
   [P in keyof T]?:
-  T[P] extends Array<infer U> ? ValueFormFieldConfigArray<U, UserTypes> : ValueFormFieldConfig<T[P], UserTypes>;
+  T[P] extends Array<infer U> ? ValueFormFieldConfigArray<U, UserConfig, UserTypes> : ValueFormFieldConfig<T[P], UserConfig, UserTypes>;
 };
 
-type ValueFormFieldConfig<T, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, any> : RecursivePartialFormFieldConfig<T, UserTypes>;
-type ValueFormFieldConfigArray<T, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, any> : RecursivePartialFormFieldConfig<T, UserTypes>;
-export type FormFieldConfigFn<T extends { [K in keyof T]: AbstractControl<any, any>; }, R> = (control: FormGroup<T>, index?: number) => R;
+type ValueFormFieldConfig<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
+type ValueFormFieldConfigArray<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
+export type FormFieldConfigFn<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserConfig> = (control: FormGroup<T>, index?: number) => UserConfig;
 
 
-export type FormControlsConfigChange<T, UserTypes> = RecursivePartialFormFieldConfigChange<FormRawValue<T>, UserTypes>;
-type RecursivePartialFormFieldConfigChange<T, UserTypes> = {
+export type FormControlsConfigChange<T, UserConfig, UserTypes> = RecursivePartialFormFieldConfigChange<FormRawValue<T>, UserConfig, UserTypes>;
+type RecursivePartialFormFieldConfigChange<T, UserConfig, UserTypes> = {
   [P in keyof T]?:
-  T[P] extends Array<infer U> ? ValueFormFieldConfigChange<U, UserTypes> : ValueFormFieldConfigChange<T[P], UserTypes>;
+  T[P] extends Array<infer U> ? ValueFormFieldConfigChange<U, UserConfig, UserTypes> : ValueFormFieldConfigChange<T[P], UserConfig, UserTypes>;
 };
-type ValueFormFieldConfigChange<T, UserTypes> = T extends AllowedTypes<UserTypes> ? any : RecursivePartialFormFieldConfigChange<T, UserTypes>;
+type ValueFormFieldConfigChange<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? UserConfig : RecursivePartialFormFieldConfigChange<T, UserConfig, UserTypes>;

@@ -15,7 +15,7 @@ export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('sto
 });
 
 @Injectable()
-export class FormService<T extends { [K in keyof T]: AbstractControl }, UserTypes> implements OnDestroy {
+export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnDestroy {
 
   /**
    * ------------------------------------
@@ -44,7 +44,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
   /**
    * for internal use only
    */
-  public readonly recalculateMethods: Array<(service?: FormService<any, any>) => void> = [];
+  public readonly recalculateMethods: Array<(service?: FormService<any, any, any>) => void> = [];
   public readonly recalculateConfig = () => {
     this.recalculateMethods.forEach(method => method());
   };
@@ -147,7 +147,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
     );
   }
 
-  public getFormFieldsConfig(): FormControlsConfig<T, UserTypes> {
+  public getFormFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
     return this.formFieldsConfig();
   }
 
@@ -162,7 +162,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
   }
 
 
-  protected formFieldsConfig(): FormControlsConfig<T, UserTypes> {
+  protected formFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
     throw new Error('From fields config not implemented!');
   }
 
@@ -226,5 +226,5 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserType
 /**
  * Types
  */
-export type ValidatorFunctions = ValidatorFn | ValidatorFn[] | null;
+export type ValidatorFunctions = ValidatorFn[];
 export type Nullable<T> = T | null | undefined;
