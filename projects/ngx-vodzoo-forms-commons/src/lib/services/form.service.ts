@@ -184,13 +184,37 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     return control;
   }
 
+  public addNullableControl<R>(
+    formArray: FormArray<FormControl<NonNullable<R> | null>>,
+    initialValue?: NonNullable<R> | null,
+    initialDisabledState?: boolean | null,
+    initialValidators?: ValidatorFunctions
+  ): FormControl<NonNullable<R> | null> {
+    markAsUiChange(formArray);
+    const control: FormControl<NonNullable<R> | null> = this.createNullableFormControl(initialValue, initialDisabledState, initialValidators);
+    formArray.push(control);
+    return control;
+  }
 
-  public removeGroup(
-    formArray: FormArray<FormGroup<T>>,
-    formGroup: FormGroup<T>
+  public addNonNullableControl<R>(
+    formArray: FormArray<FormControl<NonNullable<R>>>,
+    initialValue: NonNullable<R>,
+    initialDisabledState?: boolean | null,
+    initialValidators?: ValidatorFunctions
+  ): FormControl<NonNullable<R>> {
+    markAsUiChange(formArray);
+    const control: FormControl<NonNullable<R>> = this.createNonNullableFormControl(initialValue, initialDisabledState, initialValidators);
+    formArray.push(control);
+    return control;
+  }
+
+
+  public removeFromArray<R extends AbstractControl<S>, S>(
+    formArray: FormArray<R>,
+    control: R
   ): void {
     markAsUiChange(formArray);
-    formArray.removeAt(formArray.controls.indexOf(formGroup));
+    formArray.removeAt(formArray.controls.indexOf(control));
   }
 
 
