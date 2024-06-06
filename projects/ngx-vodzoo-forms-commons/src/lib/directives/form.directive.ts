@@ -21,7 +21,7 @@ import {
   FormGroup,
   ValidatorFn
 } from "@angular/forms";
-import {FormService, ValidatorFunctions} from "../services/form.service";
+import {FormService, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
 import {filter, map, Observable, pairwise, startWith, tap} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {isDataChangedByUi, markAsUiChange, resetUiChange} from "./form-field.directive";
@@ -32,6 +32,7 @@ import {FormEvent} from "./form-events.directive";
 export const DEFAULT_FORM_CONFIG: FormConfig = {
   saveDataWithService: true,
   clearFormWithInitialData: true,
+  dataChangedFn: (a, b) => JSON.stringify(a) !== JSON.stringify(b),
   saveInStorage: undefined // let service decide
 } as const;
 
@@ -43,6 +44,7 @@ export interface FormConfig {
   saveDataWithService?: boolean;
   saveInStorage?: boolean;
   clearFormWithInitialData?: boolean;
+  dataChangedFn: (a: any, b: any) => boolean;
 }
 
 @Directive({
@@ -231,6 +233,9 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
 
   private handleValueChanges(): Observable<ValueChanges<T, UserTypes>> {
+    let uiChange: boolean = false;
+    let dataChanged: boolean = false;
+    const storageSaveOn: StorageSaveOn[] = [];
     return this.form.valueChanges
       .pipe(
         startWith(this.form.value),
@@ -238,10 +243,19 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
         filter(() => this.rootForm),
         map<FormValue<T, UserTypes>, FormValues<T, UserTypes>>(value => ({value, rawValue: this.form.getRawValue() as FormRawValue<T>})),
         pairwise(),
-        tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId, this.saveInStorage) : null),
-        filter(() => this.valueChanged.observed),
+        tap((value) => {
+          storageSaveOn.length = 0;
+          uiChange = isDataChangedByUi(this.form);
+          dataChanged = this.formConfig.dataChangedFn(value[0].value, value[1].value);
+          storageSaveOn.push(uiChange ? 'userChange' : 'nonUserChange');
+          if (dataChanged) {
+            storageSaveOn.push('dataChange');
+          }
+        }),
+        tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId, this.saveInStorage, storageSaveOn) : null),
         map<[FormValues<T, UserTypes>, FormValues<T, UserTypes>], ValueChanges<T, UserTypes>>(value => ({
-          uiChange: isDataChangedByUi(this.form),
+          uiChange,
+          dataChanged,
           previous: value[0],
           current: value[1]
         })),
@@ -388,6 +402,7 @@ export type ValueValidatorFn = (index?: number | null) => ValidatorFunctions;
  */
 export interface ValueChanges<T, UserTypes> {
   uiChange: boolean;
+  dataChanged: boolean;
   previous: FormValues<T, UserTypes>;
   current: FormValues<T, UserTypes>;
 }

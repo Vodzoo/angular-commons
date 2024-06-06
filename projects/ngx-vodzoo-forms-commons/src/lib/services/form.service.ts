@@ -14,6 +14,20 @@ export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('sto
   factory: () => sessionStorage
 });
 
+export const DEFAULT_FORM_SERVICE_CONFIG: FormServiceConfig = {
+  storageSaveOn: ['dataChange']
+} as const;
+
+export const FORM_SERVICE_CONFIG: InjectionToken<FormServiceConfig> = new InjectionToken<FormServiceConfig>('FORM_SERVICE_CONFIG', {
+  factory: () => DEFAULT_FORM_SERVICE_CONFIG
+});
+
+export interface FormServiceConfig {
+  storageSaveOn: ReadonlyArray<StorageSaveOn>;
+}
+
+export type StorageSaveOn = 'userChange' | 'nonUserChange' | 'dataChange';
+
 @Injectable()
 export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnDestroy {
 
@@ -26,6 +40,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
   protected fb: FormBuilder = inject(FormBuilder);
   private storage: Storage = inject(STORAGE);
+  private formServiceConfig: FormServiceConfig = inject(FORM_SERVICE_CONFIG);
 
 
 
@@ -111,13 +126,20 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  public setFormValues(formValues: FormValues<T, UserTypes>, componentId: string = this.defaultComponentId, saveInStorage: boolean = this.saveInStorage, emitEvent: boolean = true): void {
+  public setFormValues(formValues: FormValues<T, UserTypes>,
+                       componentId: string = this.defaultComponentId,
+                       saveInStorage: boolean = this.saveInStorage,
+                       storageSaveAs: ReadonlyArray<StorageSaveOn> = this.formServiceConfig.storageSaveOn,
+                       emitEvent: boolean = true): void {
     this.formValues.set(componentId, formValues);
     if (emitEvent) {
       this.formValuesChanges$.next(this.formValues);
     }
     if (saveInStorage) {
-      this.storage.setItem(componentId, JSON.stringify(formValues));
+      const configStorageSaveOn: ReadonlyArray<StorageSaveOn> = this.formServiceConfig.storageSaveOn;
+      if (configStorageSaveOn.some(configSave => storageSaveAs.includes(configSave))) {
+        this.storage.setItem(componentId, JSON.stringify(formValues));
+      }
     }
   }
 
