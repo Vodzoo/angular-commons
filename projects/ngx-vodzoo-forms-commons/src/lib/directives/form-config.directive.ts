@@ -40,6 +40,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    */
   private _defaultFormFieldsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.formService.getFormFieldsConfig();
+  private _defaultFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
   private _formControlsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this._defaultFormFieldsConfig;
   private _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
   private _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
@@ -65,6 +66,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   public set formControlsConfig(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined) {
     this._formControlsConfig = !value || Object.keys(value).length === 0 ? this._defaultFormFieldsConfig : value;
     this.setConfig(this._formControlsConfig);
+    this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
     this.setConfigChange(this.mapConfigToChange(value));
   }
 
@@ -96,6 +98,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this.formDirective.form.valueChanges.pipe(
       startWith(this.formDirective.form.value),
       tap(() => {
+        this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
         this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
       }),
       takeUntilDestroyed(this.destroyRef)
@@ -121,7 +124,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     const change: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
     Object.keys(mergedConfig).forEach((key: string) => {
       if ((typeof (mergedConfig as any)[key]) === 'function') {
-        (change as any)[key] = ((mergedConfig as any)[key] as FormFieldConfigFn<T, any>)(this.formDirective.form, this.formDirective.formIndex);
+        (change as any)[key] = ((mergedConfig as any)[key] as FormFieldConfigFn<T, any, any>)(this.formDirective.form, this._defaultFormFieldsConfigChange, this.formDirective.formIndex);
       }
     })
     return change;
@@ -151,9 +154,9 @@ type RecursivePartialFormFieldConfig<T, UserConfig, UserTypes> = {
   T[P] extends Array<infer U> ? ValueFormFieldConfigArray<U, UserConfig, UserTypes> : ValueFormFieldConfig<T[P], UserConfig, UserTypes>;
 };
 
-type ValueFormFieldConfig<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
-type ValueFormFieldConfigArray<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
-export type FormFieldConfigFn<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserConfig> = (control: FormGroup<T>, index?: number) => UserConfig;
+type ValueFormFieldConfig<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig, UserTypes> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
+type ValueFormFieldConfigArray<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig, UserTypes> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
+export type FormFieldConfigFn<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserConfig, UserTypes> = (control: FormGroup<T>, defaultConfig: FormControlsConfigChange<T, UserConfig, UserTypes>, index?: number) => UserConfig;
 
 
 export type FormControlsConfigChange<T, UserConfig, UserTypes> = RecursivePartialFormFieldConfigChange<FormRawValue<T>, UserConfig, UserTypes>;
