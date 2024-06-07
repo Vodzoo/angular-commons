@@ -3,7 +3,6 @@ import {
   AbstractControl,
   ControlValueAccessor,
   FormControl,
-  FormGroup,
   NG_VALIDATORS,
   NG_VALUE_ACCESSOR,
   ValidationErrors,
@@ -108,8 +107,11 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
     return this._isDisabled;
   };
 
-  public get rootFormGroup(): FormGroup | undefined {
-    return this._baseFormControl?.root as FormGroup | undefined;
+  public get baseControl(): FormControl {
+    if (!this._baseFormControl) {
+      throw new Error('base control does not exist yet');
+    }
+    return this._baseFormControl as FormControl;
   }
 
 
