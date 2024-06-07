@@ -107,11 +107,8 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
     return this._isDisabled;
   };
 
-  public get baseControl(): FormControl {
-    if (!this._baseFormControl) {
-      throw new Error('base control does not exist yet');
-    }
-    return this._baseFormControl as FormControl;
+  public get baseControl(): FormControl | undefined {
+    return this._baseFormControl as FormControl | undefined;
   }
 
 
