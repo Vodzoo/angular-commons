@@ -1,8 +1,11 @@
 import {AbstractControl, ValidatorFn} from "@angular/forms";
-import {getControlName} from "./directives/form-field.directive";
 import {ControlOptions} from "./disableWithContext";
 
-export function addValidators(control: AbstractControl, validators: ValidatorFn[], context?: string, opts?: ControlOptions): void {
+export function switchValidators(condition: () => boolean, context: string, control: AbstractControl, validators: ValidatorFn[], opts?: ControlOptions): void {
+  condition() ? addValidators(context, control, validators, opts) : removeValidators(context, control, validators, opts);
+}
+
+export function addValidators(context: string, control: AbstractControl, validators: ValidatorFn[], opts?: Omit<ControlOptions, 'force'>): void {
   const allContextsValidators: ValidatorFn[] = getAllContextsValidators(control);
   validators.forEach(validator => {
     if (control.hasValidator(validator) && !allContextsValidators.includes(validator)) {
@@ -15,22 +18,21 @@ export function addValidators(control: AbstractControl, validators: ValidatorFn[
   control.updateValueAndValidity(opts);
 }
 
-export function removeValidators(control: AbstractControl, context?: string, validators?: ValidatorFn[], opts?: ControlOptions): void {
+export function removeValidators(context: string, control: AbstractControl, validators?: ValidatorFn[], opts?: ControlOptions): void {
   const contexts: AddValidatorsContexts | undefined = getContexts(control);
-  if (!contexts) {
-    return;
-  }
-  context = ensureContext(control, context);
-  const contextValidators: ValidatorFn[] = contexts.get(context) ?? [];
+  const contextValidators: ValidatorFn[] = contexts?.get(context) ?? [];
   let validatorsToRemove: ValidatorFn[] = validators ?? contextValidators;
+
   if (validatorsToRemove.length === 0) {
     return;
   }
 
-
-  setContext(control, validators ? contextValidators.filter(contextValidator => !validators.includes(contextValidator)) : [], context);
-  if (getAllContextsValidators(control).some(contextValidator => validatorsToRemove.includes(contextValidator))) {
-    return;
+  if (!contexts) {
+    validatorsToRemove.forEach(validator => {
+      if (control.hasValidator(validator)) {
+        addExistingValidator(control, validator);
+      }
+    });
   }
 
   validatorsToRemove.forEach(validatorToRemove => {
@@ -38,7 +40,15 @@ export function removeValidators(control: AbstractControl, context?: string, val
       removeExistingValidator(control, validatorToRemove);
     }
   });
-  validatorsToRemove = validatorsToRemove.filter(validatorToRemove => !getExistingValidators(control)?.has(validatorToRemove));
+
+  if (!opts?.force) {
+    validatorsToRemove = validatorsToRemove.filter(validatorToRemove => !getExistingValidators(control)?.has(validatorToRemove));
+  }
+  if (contexts) {
+    validatorsToRemove = validatorsToRemove.filter(validatorToRemove => contextValidators.includes(validatorToRemove));
+  }
+
+  setContext(control, contextValidators.filter(contextValidator => !validatorsToRemove.includes(contextValidator)), context);
   control.removeValidators(validatorsToRemove);
   control.updateValueAndValidity(opts);
 }
@@ -81,8 +91,7 @@ function getAllContextsValidators(control: AbstractControl): ValidatorFn[] {
   return [...context.values()].flat();
 }
 
-function setContext(control: AbstractControl, contextValue: ValidatorFn[], context?: string): void {
-  context = ensureContext(control, context);
+function setContext(control: AbstractControl, contextValue: ValidatorFn[], context: string): void {
   const contexts: AddValidatorsContexts = getContexts(control) ?? new Map();
   contexts.set(context, contextValue);
   (control as AbstractControlWithContexts)[addValidatorsContext] = contexts;
@@ -90,10 +99,6 @@ function setContext(control: AbstractControl, contextValue: ValidatorFn[], conte
 
 function setExistingValidators(control: AbstractControl, validators: ExistingValidators): void {
   (control as AbstractControlWithExistingValidators)[existingValidators] = validators;
-}
-
-function ensureContext(control: AbstractControl, context?: string): string {
-  return context ?? getControlName(control);
 }
 
 const addValidatorsContext: unique symbol = Symbol('addValidatorsContext');
