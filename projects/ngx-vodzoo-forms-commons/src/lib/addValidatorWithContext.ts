@@ -7,13 +7,19 @@ export function switchValidators(condition: () => boolean, context: string, cont
 
 export function addValidators(context: string, control: AbstractControl, validators: ValidatorFn[], opts?: Omit<ControlOptions, 'force'>): void {
   const allContextsValidators: ValidatorFn[] = getAllContextsValidators(control);
+  const validatorsToAdd: ValidatorFn[] = [];
   validators.forEach(validator => {
-    if (control.hasValidator(validator) && !allContextsValidators.includes(validator)) {
+    if (!control.hasValidator(validator)) {
+      validatorsToAdd.push(validator);
+    } else if (!allContextsValidators.includes(validator)) {
       addExistingValidator(control, validator);
     }
   })
 
   setContext(control, validators, context);
+  if (validatorsToAdd.length === 0) {
+    return;
+  }
   control.addValidators(validators);
   control.updateValueAndValidity(opts);
 }
@@ -47,8 +53,12 @@ export function removeValidators(context: string, control: AbstractControl, vali
   if (contexts) {
     validatorsToRemove = validatorsToRemove.filter(validatorToRemove => contextValidators.includes(validatorToRemove));
   }
-
   setContext(control, contextValidators.filter(contextValidator => !validatorsToRemove.includes(contextValidator)), context);
+
+  validatorsToRemove = validatorsToRemove.filter(validatorToRemove => control.hasValidator(validatorToRemove));
+  if (validatorsToRemove.length === 0) {
+    return;
+  }
   control.removeValidators(validatorsToRemove);
   control.updateValueAndValidity(opts);
 }

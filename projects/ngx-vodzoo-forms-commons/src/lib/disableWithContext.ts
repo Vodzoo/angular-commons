@@ -14,6 +14,9 @@ export function disableControl(context: string, control: AbstractControl, opts?:
   }
 
   setContext(control, true, context);
+  if (control.disabled) {
+    return;
+  }
   control.disable(opts);
 }
 
@@ -28,7 +31,7 @@ export function enableControl(context: string, control: AbstractControl, opts?: 
     setContext(control, false, unknownContext);
   }
 
-  if (hasBlockingContext(control)) {
+  if (control.enabled || hasBlockingContext(control)) {
     return;
   }
   control.enable(opts);
