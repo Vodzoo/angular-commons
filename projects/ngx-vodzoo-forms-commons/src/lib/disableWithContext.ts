@@ -14,7 +14,7 @@ export function disableControl(context: string, control: AbstractControl, opts?:
   }
 
   setContext(control, true, context);
-  if (control.disabled) {
+  if (control.disabled || isControlForceEnabled(control)) {
     return;
   }
   control.disable(opts);
@@ -35,6 +35,24 @@ export function enableControl(context: string, control: AbstractControl, opts?: 
     return;
   }
   control.enable(opts);
+}
+
+export function forceEnableControl(control: AbstractControl, opts?: Omit<ControlOptions, 'force'>): void {
+  (control as AbstractControlWithForce)[forceEnabled] = true;
+  if (control.disabled) {
+    control.enable(opts);
+  }
+}
+
+export function resetForceEnableControl(control: AbstractControl, opts?: Omit<ControlOptions, 'force'>): void {
+  (control as AbstractControlWithForce)[forceEnabled] = false;
+  if (control.enabled && hasBlockingContext(control)) {
+    control.disable(opts);
+  }
+}
+
+export function isControlForceEnabled(control: AbstractControl): control is AbstractControlWithForce {
+  return !!(control as AbstractControlWithForce)[forceEnabled];
 }
 
 export function getDisablingContexts(control: AbstractControl): string[] {
@@ -61,6 +79,7 @@ function setContext(control: AbstractControl, contextValue: boolean, context: st
 }
 
 const disabledContext: unique symbol = Symbol('disabledContext');
+const forceEnabled: unique symbol = Symbol('forceEnabled');
 const unknownContext: string = '__unknown__';
 
 export type DisableContexts = Map<string, boolean>;
@@ -70,3 +89,4 @@ export type ControlOptions = {
   force?: boolean;
 }
 type AbstractControlWithContexts = AbstractControl & {[disabledContext]: DisableContexts};
+type AbstractControlWithForce = AbstractControl & {[forceEnabled]?: boolean};
