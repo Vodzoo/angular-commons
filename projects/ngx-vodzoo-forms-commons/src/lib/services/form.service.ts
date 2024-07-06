@@ -15,7 +15,7 @@ export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('sto
 });
 
 export const DEFAULT_FORM_SERVICE_CONFIG: FormServiceConfig = {
-  storageSaveOn: ['dataChange']
+  storageSaveOn: ['userChange']
 } as const;
 
 export const FORM_SERVICE_CONFIG: InjectionToken<FormServiceConfig> = new InjectionToken<FormServiceConfig>('FORM_SERVICE_CONFIG', {
@@ -26,7 +26,7 @@ export interface FormServiceConfig {
   storageSaveOn: ReadonlyArray<StorageSaveOn>;
 }
 
-export type StorageSaveOn = 'userChange' | 'nonUserChange' | 'dataChange';
+export type StorageSaveOn = 'userChange' | 'nonUserChange' | 'dataChange' | 'rawDataChange';
 
 @Injectable()
 export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnDestroy {

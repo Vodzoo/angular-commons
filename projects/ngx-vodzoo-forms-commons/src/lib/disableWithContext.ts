@@ -1,4 +1,5 @@
 import {AbstractControl} from "@angular/forms";
+import {markAsUiChange} from "./directives/form-field.directive";
 
 export function switchDisable(condition: () => boolean, context: string, control: AbstractControl, opts?: ControlOptions): void {
   condition() ? disableControl(context, control, opts) : enableControl(context, control, opts);
@@ -17,6 +18,9 @@ export function disableControl(context: string, control: AbstractControl, opts?:
   if (control.disabled || isControlForceEnabled(control)) {
     return;
   }
+  if (opts?.emitEvent !== false && opts?.markAsUiChange) {
+    markAsUiChange(control);
+  }
   control.disable(opts);
 }
 
@@ -34,21 +38,32 @@ export function enableControl(context: string, control: AbstractControl, opts?: 
   if (control.enabled || hasBlockingContext(control)) {
     return;
   }
+  if (opts?.emitEvent !== false && opts?.markAsUiChange) {
+    markAsUiChange(control);
+  }
   control.enable(opts);
 }
 
 export function forceEnableControl(control: AbstractControl, opts?: Omit<ControlOptions, 'force'>): void {
   (control as AbstractControlWithForce)[forceEnabled] = true;
-  if (control.disabled) {
-    control.enable(opts);
+  if (control.enabled) {
+    return;
   }
+  if (opts?.emitEvent !== false && opts?.markAsUiChange) {
+    markAsUiChange(control);
+  }
+  control.enable(opts);
 }
 
 export function resetForceEnableControl(control: AbstractControl, opts?: Omit<ControlOptions, 'force'>): void {
   (control as AbstractControlWithForce)[forceEnabled] = false;
-  if (control.enabled && hasBlockingContext(control)) {
-    control.disable(opts);
+  if (!(control.enabled && hasBlockingContext(control))) {
+    return;
   }
+  if (opts?.emitEvent !== false && opts?.markAsUiChange) {
+    markAsUiChange(control);
+  }
+  control.disable(opts);
 }
 
 export function isControlForceEnabled(control: AbstractControl): control is AbstractControlWithForce {
@@ -87,6 +102,7 @@ export type ControlOptions = {
   onlySelf?: boolean;
   emitEvent?: boolean;
   force?: boolean;
+  markAsUiChange?: boolean;
 }
 type AbstractControlWithContexts = AbstractControl & {[disabledContext]: DisableContexts};
 type AbstractControlWithForce = AbstractControl & {[forceEnabled]?: boolean};

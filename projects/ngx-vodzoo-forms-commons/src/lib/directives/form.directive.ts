@@ -235,6 +235,8 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private handleValueChanges(): Observable<ValueChanges<T, UserTypes>> {
     let uiChange: boolean = false;
     let dataChanged: boolean = false;
+    let rawDataChanged: boolean = false;
+    let firstUiChange: boolean = true;
     const storageSaveOn: StorageSaveOn[] = [];
     return this.form.valueChanges
       .pipe(
@@ -247,19 +249,31 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
           storageSaveOn.length = 0;
           uiChange = isDataChangedByUi(this.form);
           dataChanged = this.formConfig.dataChangedFn(value[0].value, value[1].value);
+          rawDataChanged = this.formConfig.dataChangedFn(value[0].rawValue, value[1].rawValue);
           storageSaveOn.push(uiChange ? 'userChange' : 'nonUserChange');
           if (dataChanged) {
             storageSaveOn.push('dataChange');
           }
+          if (rawDataChanged) {
+            storageSaveOn.push('rawDataChange');
+          }
+          resetUiChange(this.form);
         }),
+        filter(() => dataChanged || rawDataChanged),
         tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId, this.saveInStorage, storageSaveOn) : null),
         map<[FormValues<T, UserTypes>, FormValues<T, UserTypes>], ValueChanges<T, UserTypes>>(value => ({
           uiChange,
           dataChanged,
+          rawDataChanged,
+          firstUiChange: firstUiChange && uiChange,
           previous: value[0],
           current: value[1]
         })),
-        tap(() => resetUiChange(this.form)),
+        tap(() => {
+          if (uiChange) {
+            firstUiChange = false;
+          }
+        }),
         tap((value: ValueChanges<T, UserTypes>) => this.valueChanged.emit(value)),
         takeUntilDestroyed(this.destroyRef)
       ) as Observable<ValueChanges<T, UserTypes>>;
@@ -403,6 +417,8 @@ export type ValueValidatorFn = (index?: number | null) => ValidatorFunctions;
 export interface ValueChanges<T, UserTypes> {
   uiChange: boolean;
   dataChanged: boolean;
+  rawDataChanged: boolean;
+  firstUiChange: boolean;
   previous: FormValues<T, UserTypes>;
   current: FormValues<T, UserTypes>;
 }
