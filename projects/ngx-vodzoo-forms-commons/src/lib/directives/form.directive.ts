@@ -24,7 +24,13 @@ import {
 import {FormService, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
 import {filter, map, Observable, pairwise, startWith, tap} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
-import {isDataChangedByUi, markAsUiChange, resetUiChange} from "./form-field.directive";
+import {
+  isDataChangedByUi,
+  markAsResetChange,
+  markAsUiChange,
+  resetResetChange,
+  resetUiChange
+} from "./form-field.directive";
 import {FormEventService} from "../services/form-event.service";
 import {FormEvent} from "./form-events.directive";
 
@@ -192,6 +198,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     if (this.rootForm) {
       this.sendFormCreated();
       this.sendComponentId();
+      this.sendStatusChanged({current: this.form.status, previous: this.form.status});
       this.handleEvents().subscribe();
     }
   }
@@ -221,6 +228,13 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private sendFormCreated(): void {
     if (this.formCreated.observed) {
       this.formCreated.emit(this.form);
+    }
+  }
+
+
+  private sendStatusChanged(value?: StatusChanges): void {
+    if (this.statusChanged.observed) {
+      this.statusChanged.emit(value);
     }
   }
 
@@ -342,10 +356,14 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     }
     this.clearForm
       .pipe(
-        tap(() => markAsUiChange(this.form)),
+        tap((clearObject) => clearObject?.options?.emitEvent !== false ? markAsUiChange(this.form) : null),
+        tap(() => markAsResetChange(this.form)),
         takeUntilDestroyed(this.destroyRef)
       )
-      .subscribe(clearObject => this.form.reset(clearObject?.value ?? (this.clearFormWithInitialData ? this.initialData as any : this.formService.getFormGroup().getRawValue()), clearObject?.options));
+      .subscribe(clearObject => {
+        this.form.reset(clearObject?.value ?? (this.clearFormWithInitialData ? this.initialData as any : this.formService.getFormGroup().getRawValue()), clearObject?.options);
+        resetResetChange(this.form);
+      });
   }
 
 

@@ -151,7 +151,11 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
 
   public writeValue(obj: T): void {
     this._value = obj;
-    this.formControl.patchValue(obj, {emitEvent: false, onlySelf: true});
+    if (isResetChange(this.baseControl)) {
+      this.formControl.reset(obj, {emitEvent: false, onlySelf: true});
+    } else {
+      this.formControl.patchValue(obj, {emitEvent: false, onlySelf: true});
+    }
     this._valueChange$.next(obj);
     this.cdr.markForCheck();
   }
@@ -222,6 +226,7 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
 }
 
 export const uiChange: unique symbol = Symbol('uiChange');
+export const resetChange: unique symbol = Symbol('resetChange');
 export const FORM_FIELD_CONFIG: InjectionToken<FormFieldConfig> = new InjectionToken<FormFieldConfig>('formFieldConfig', {
   factory: () => ({
     enableTouchOnInitialError: (control) => {
@@ -240,6 +245,30 @@ export function getControlName(control: AbstractControl): string {
   }
   return Object.entries(control.parent.controls).find(entry => entry[1] === control)?.[0] ?? '';
 }
+
+
+/**
+ * Reset change functions
+ * @param control
+ */
+export function markAsResetChange(control?: AbstractControl): void {
+  if (control) {
+    (control.root as any)[resetChange] = true;
+  }
+}
+
+
+export function resetResetChange(control?: AbstractControl): void {
+  if (control) {
+    (control.root as any)[resetChange] = undefined;
+  }
+}
+
+
+export function isResetChange(control?: AbstractControl): boolean {
+  return !!(control?.root as any)?.[resetChange];
+}
+
 
 /**
  * UI change functions
@@ -267,7 +296,7 @@ export function isDataChangedByUi(control?: AbstractControl): boolean {
 }
 
 export function isChangedByUiUnset(control?: AbstractControl): boolean {
-  return (control?.root as any)[uiChange] === undefined;
+  return (control?.root as any)?.[uiChange] === undefined;
 }
 
 function markAsChange(control: AbstractControl, changedByUi: boolean | undefined): void {
