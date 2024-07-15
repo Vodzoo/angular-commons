@@ -215,7 +215,7 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
       this.formControl.setErrors(allErrors, {emitEvent: false});
 
       const errors: ValidationErrors | null = this.formControl.errors;
-      if (this.formControl.untouched && errors && this.config.enableTouchOnInitialError(this.formControl, this.formControlName)) {
+      if (this.formControl.pristine && this.formControl.untouched && errors && this.config.enableTouchOnInitialError(this.formControl, this.formControlName)) {
         this.formControl.markAsTouched({onlySelf: true});
       }
       this.cdr.markForCheck();

@@ -2,7 +2,7 @@ import {DestroyRef, Directive, inject, InjectionToken, Input, OnDestroy, OnInit}
 import {AbstractControl, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {FormService} from "../services/form.service";
-import {BehaviorSubject, Observable, startWith, tap} from "rxjs";
+import { BehaviorSubject, debounceTime, Observable, startWith, tap } from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 
 
@@ -97,6 +97,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   public ngOnInit(): void {
     this.formDirective.form.valueChanges.pipe(
       startWith(this.formDirective.form.value),
+      debounceTime(0),
       tap(() => {
         this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
         this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
