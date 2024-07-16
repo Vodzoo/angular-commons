@@ -2,7 +2,7 @@ import {DestroyRef, Directive, inject, InjectionToken, Input, OnDestroy, OnInit}
 import {AbstractControl, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {FormService} from "../services/form.service";
-import { BehaviorSubject, debounceTime, Observable, startWith, tap } from "rxjs";
+import { BehaviorSubject, debounceTime, Observable, tap } from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 
 
@@ -44,6 +44,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   private _formControlsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this._defaultFormFieldsConfig;
   private _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
   private _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
+  private _initialRecalculate: boolean = false;
   public readonly controlsConfig: Observable<FormControlsConfig<T, UserConfig, UserTypes>> = this._controlsConfig$.asObservable();
   public readonly controlsConfigChange: Observable<FormControlsConfigChange<T, UserConfig, UserTypes>> = this._formControlsConfigChange$.asObservable();
   public readonly recalculateConfig = (service?: FormService<any, any, any>) => {
@@ -68,6 +69,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this.setConfig(this._formControlsConfig);
     this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
     this.setConfigChange(this.mapConfigToChange(value));
+    this._initialRecalculate = true;
   }
 
 
@@ -95,9 +97,17 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    */
   public ngOnInit(): void {
+    if (!this._initialRecalculate) {
+      this._initialRecalculate = true;
+      this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
+      this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
+    }
+    if (Object.keys(this.controlsConfigChangeValue).length === 0) {
+      return;
+    }
     this.formDirective.form.valueChanges.pipe(
-      startWith(this.formDirective.form.value),
       debounceTime(0),
+      tap(() => console.log('recalculate', this._formControlsConfig)),
       tap(() => {
         this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
         this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
