@@ -107,7 +107,6 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     }
     this.formDirective.form.valueChanges.pipe(
       debounceTime(0),
-      tap(() => console.log('recalculate', this._formControlsConfig)),
       tap(() => {
         this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
         this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
