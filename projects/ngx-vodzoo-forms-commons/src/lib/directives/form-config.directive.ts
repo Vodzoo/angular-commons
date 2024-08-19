@@ -12,6 +12,19 @@ export interface RecalculateConfig {
   registerRecalculate(fn: (service?: FormService<any, any, any>) => void): void;
 }
 
+export const DEFAULT_FORM_CONFIGURATION_CONFIG: FormConfigurationConfig = {
+  alwaysTrackConfigChange: true,
+} as const;
+
+export const FORM_CONFIGURATION_CONFIG: InjectionToken<FormConfigurationConfig> = new InjectionToken<FormConfigurationConfig>('FORM_CONFIGURATION_CONFIG', {
+  factory: () => DEFAULT_FORM_CONFIGURATION_CONFIG
+});
+
+export interface FormConfigurationConfig {
+  alwaysTrackConfigChange?: boolean;
+}
+
+
 @Directive({
   selector: '[vodzooFormConfig]',
   exportAs: 'vodzooFormConfig',
@@ -27,11 +40,14 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   private formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
   private formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
   private destroyRef: DestroyRef = inject(DestroyRef);
+  private formConfigurationConfig: FormConfigurationConfig = inject(FORM_CONFIGURATION_CONFIG);
 
   constructor() {
     this.formService.recalculateMethods.push(this.recalculateConfig);
     inject(RECALCULATE_CONFIG, {optional: true})?.forEach(rc => rc.registerRecalculate(this.recalculateConfig));
   }
+
+
 
 
   /**
@@ -53,7 +69,6 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     }
     this.formControlsConfig = this._formControlsConfig;
   }
-
 
 
 
@@ -102,7 +117,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
       this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
       this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
     }
-    if (Object.keys(this.controlsConfigChangeValue).length === 0) {
+    if (!this.formConfigurationConfig.alwaysTrackConfigChange && Object.keys(this.controlsConfigChangeValue).length === 0) {
       return;
     }
     this.formDirective.form.valueChanges.pipe(
