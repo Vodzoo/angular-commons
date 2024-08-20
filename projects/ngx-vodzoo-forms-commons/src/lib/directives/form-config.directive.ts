@@ -114,6 +114,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   public ngOnInit(): void {
     if (!this._initialRecalculate) {
       this._initialRecalculate = true;
+      this.setConfig(this._formControlsConfig);
       this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
       this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
     }
@@ -123,6 +124,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this.formDirective.form.valueChanges.pipe(
       debounceTime(0),
       tap(() => {
+        this.setConfig(this._formControlsConfig);
         this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
         this.setConfigChange(this.mapConfigToChange(this._formControlsConfig));
       }),
@@ -160,7 +162,12 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   }
 
   private setConfig(value: FormControlsConfig<T, UserConfig, UserTypes>): void {
-    this._controlsConfig$.next(value);
+    const config: any = value;
+    const newConfig: any = {};
+    Object.keys(config).forEach(key => {
+      newConfig[key] = typeof config[key] === 'function' ? config[key] : { ...config[key] };
+    });
+    this._controlsConfig$.next(newConfig);
   }
 }
 
