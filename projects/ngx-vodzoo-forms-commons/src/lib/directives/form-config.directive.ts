@@ -4,6 +4,7 @@ import {FormDirective, FormRawValue} from "./form.directive";
 import {FormService} from "../services/form.service";
 import { BehaviorSubject, debounceTime, Observable, tap } from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
+import {setConfig} from "../formConfig";
 
 
 export const RECALCULATE_CONFIG: InjectionToken<readonly RecalculateConfig[]> = new InjectionToken<readonly RecalculateConfig[]>('RECALCULATE_CONFIG');
@@ -167,6 +168,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     Object.keys(config).forEach(key => {
       newConfig[key] = typeof config[key] === 'function' ? config[key] : { ...config[key] };
     });
+    setConfig(this.formDirective.form, newConfig);
     this._controlsConfig$.next(newConfig);
   }
 }

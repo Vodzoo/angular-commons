@@ -9,6 +9,7 @@ import {
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {markAsUiChange} from "../directives/form-field.directive";
 import {FormControlsConfig} from "../directives/form-config.directive";
+import {setConfig} from "../formConfig";
 
 export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('storage', {
   factory: () => sessionStorage
@@ -161,12 +162,14 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     const hasInitialValue: boolean = !!initialValue || !!this.initialValue;
     const hasInitialDisableState: boolean = !!initialDisabledState || !!this.initialDisabledState;
     const hasInitialValidators: boolean = !!initialValidators || !!this.initialValidators;
-    return this.fromGroupConfig(
+    const fg: FormGroup<T> = this.fromGroupConfig(
       hasInitialValue ? {...this.initialValue, ...initialValue} : undefined,
       hasInitialDisableState ? {...this.initialDisabledState, ...initialDisabledState} : undefined,
       hasInitialValidators ? {...this.initialValidators, ...initialValidators} : undefined,
       index
     );
+    setConfig(fg, this.formFieldsConfig());
+    return fg;
   }
 
   public getFormFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
@@ -185,7 +188,8 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
   protected formFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
-    throw new Error('From fields config not implemented!');
+    console.warn('NYI, returning empty config!')
+    return {};
   }
 
 
