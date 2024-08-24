@@ -8,8 +8,9 @@ import {
 } from '../directives/form.directive';
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {markAsUiChange} from "../directives/form-field.directive";
-import {FormControlsConfig} from "../directives/form-config.directive";
+import {FormControlsConfig, FormFieldConfigFn} from "../directives/form-config.directive";
 import {setConfig} from "../formConfig";
+import {mergeDeep} from "../mergeDeep";
 
 export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('storage', {
   factory: () => sessionStorage
@@ -172,8 +173,33 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     return fg;
   }
 
+
   public getFormFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
     return this.formFieldsConfig();
+  }
+
+
+  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; }): FormControlsConfig<T, UserConfig, UserTypes> {
+    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.getFormFieldsConfig();
+    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {};
+
+    Object.keys(defaultConfig).forEach(key => {
+      const defaultValue: FormFieldConfigFn<T, UserConfig, UserTypes> | object | undefined = (defaultConfig as any)[key];
+      const newValue: FormFieldConfigFn<T, UserConfig, UserTypes> | object | undefined = (newConfig as any)[key];
+      if (!newValue) {
+        (mergedConfig as any)[key] = defaultValue;
+      } else if (typeof defaultValue === 'function' && typeof newValue === 'function') {
+        const mergedFn: FormFieldConfigFn<T, UserConfig, UserTypes> = (control: FormGroup<T>, config: any, index?: number): any => {
+          const defaultFieldConfig = defaultValue(control, config, index) ?? {};
+          const newFieldConfig = newValue(control, config, index) ?? {};
+          return mergeDeep(defaultFieldConfig, newFieldConfig, opts?.mergeArrays);
+        };
+        (mergedConfig as any)[key] = mergedFn;
+      } else {
+        (mergedConfig as any)[key] = newValue;
+      }
+    })
+    return mergedConfig;
   }
 
 
