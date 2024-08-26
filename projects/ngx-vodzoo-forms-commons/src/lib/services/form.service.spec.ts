@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import {FormService} from './form.service';
 
 describe('FormService', () => {
-  let service: FormService<any>;
+  let service: FormService<any, any, any>;
 
   beforeEach(() => {
     TestBed.configureTestingModule({

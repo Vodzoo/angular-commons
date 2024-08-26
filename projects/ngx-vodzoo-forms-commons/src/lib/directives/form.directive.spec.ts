@@ -5,7 +5,7 @@ import {FormService} from "../services/form.service";
 import {FormGroup} from "@angular/forms";
 
 @Injectable()
-class Test extends FormService<any> {
+class Test extends FormService<any, any, any> {
   override fromGroupConfig(): FormGroup {
     return this.fb.group({});
   }
