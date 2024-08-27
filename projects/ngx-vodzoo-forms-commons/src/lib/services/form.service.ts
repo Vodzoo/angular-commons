@@ -17,7 +17,7 @@ export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('sto
 });
 
 export const DEFAULT_FORM_SERVICE_CONFIG: FormServiceConfig = {
-  storageSaveOn: ['dataChange']
+  storageSaveOn: ['userChange']
 } as const;
 
 export const FORM_SERVICE_CONFIG: InjectionToken<FormServiceConfig> = new InjectionToken<FormServiceConfig>('FORM_SERVICE_CONFIG', {

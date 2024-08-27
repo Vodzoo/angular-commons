@@ -1,8 +1,8 @@
 import {DestroyRef, Directive, inject, InjectionToken, Input, OnDestroy, OnInit} from '@angular/core';
-import {AbstractControl, FormGroup} from "@angular/forms";
+import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {FormService} from "../services/form.service";
-import { BehaviorSubject, debounceTime, Observable, tap } from "rxjs";
+import {BehaviorSubject, debounceTime, distinctUntilChanged, Observable, tap} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {setConfig} from "../formConfig";
 import {mergeDeep} from "../mergeDeep";
@@ -16,6 +16,7 @@ export interface RecalculateConfig {
 
 export const DEFAULT_FORM_CONFIGURATION_CONFIG: FormConfigurationConfig = {
   alwaysTrackConfigChange: true,
+  equalFn: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 } as const;
 
 export const FORM_CONFIGURATION_CONFIG: InjectionToken<FormConfigurationConfig> = new InjectionToken<FormConfigurationConfig>('FORM_CONFIGURATION_CONFIG', {
@@ -24,6 +25,7 @@ export const FORM_CONFIGURATION_CONFIG: InjectionToken<FormConfigurationConfig> 
 
 export interface FormConfigurationConfig {
   alwaysTrackConfigChange?: boolean;
+  equalFn: (a: any, b: any) => boolean;
 }
 
 
@@ -85,8 +87,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this._formControlsConfig = !value || Object.keys(value).length === 0 ? this._defaultFormFieldsConfig : value;
     this.setConfig(this._formControlsConfig);
     this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-    const currentFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(value);
-    this.setConfigChange(mergeDeep(this._defaultFormFieldsConfigChange, currentFormFieldsConfigChange));
+    const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
+    const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(value);
+    this.setConfigChange(mergeDeep(targetChange, sourceChange));
     this._initialRecalculate = true;
   }
 
@@ -119,19 +122,32 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
       this._initialRecalculate = true;
       this.setConfig(this._formControlsConfig);
       this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-      const currentFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-      this.setConfigChange(mergeDeep(this._defaultFormFieldsConfigChange, currentFormFieldsConfigChange));
+      const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
+      const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
+      this.setConfigChange(mergeDeep(targetChange, sourceChange));
     }
     if (!this.formConfigurationConfig.alwaysTrackConfigChange && Object.keys(this.controlsConfigChangeValue).length === 0) {
       return;
     }
+
+    let status: FormControlStatus = this.formDirective.form.status;
     this.formDirective.form.valueChanges.pipe(
       debounceTime(0),
+      distinctUntilChanged((prev, cur) => {
+        const curStatus: FormControlStatus = this.formDirective.form.status;
+        const statusChanged: boolean = curStatus !== status;
+        if (statusChanged) {
+          status = curStatus;
+          return false;
+        }
+        return this.formConfigurationConfig.equalFn(prev, cur);
+      }),
       tap(() => {
         this.setConfig(this._formControlsConfig);
         this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-        const currentFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-        this.setConfigChange(mergeDeep(this._defaultFormFieldsConfigChange, currentFormFieldsConfigChange));
+        const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
+        const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
+        this.setConfigChange(mergeDeep(targetChange, sourceChange));
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -152,7 +168,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    */
   private mapConfigToChange(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined): FormControlsConfigChange<T, UserConfig, UserTypes> {
-    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {...this._defaultFormFieldsConfig, ...value};
+    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = value !== this._defaultFormFieldsConfig ? {...this._defaultFormFieldsConfig, ...value} : value;
     const change: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
     Object.keys(mergedConfig).forEach((key: string) => {
       if ((typeof (mergedConfig as any)[key]) === 'function') {
