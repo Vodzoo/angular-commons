@@ -200,6 +200,10 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
       control.markAsPristine();
     }
 
+    if (this.formControl.untouched && control.touched) {
+      this.formControl.markAsTouched({onlySelf: true});
+    }
+
     if (control.errors === null && this.formControl.errors === null) {
       this.cdr.markForCheck();
       return null;

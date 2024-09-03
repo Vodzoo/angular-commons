@@ -9,7 +9,7 @@ import {
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {markAsUiChange} from "../directives/form-field.directive";
 import {FormControlsConfig, FormFieldConfigFn} from "../directives/form-config.directive";
-import {setConfig} from "../formConfig";
+import {setConfig, setDefaultConfig} from "../formConfig";
 import {mergeDeep} from "../mergeDeep";
 
 export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('storage', {
@@ -169,6 +169,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
       hasInitialValidators ? {...this.initialValidators, ...initialValidators} : undefined,
       index
     );
+    setDefaultConfig(fg, this.formFieldsConfig());
     setConfig(fg, this.formFieldsConfig());
     return fg;
   }
