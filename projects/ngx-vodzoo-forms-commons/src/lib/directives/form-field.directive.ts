@@ -9,11 +9,11 @@ import {
   Validator,
   Validators
 } from "@angular/forms";
-import {Observable, Subject, tap} from "rxjs";
+import {Observable, Subject, take, tap} from "rxjs";
 
 @Directive({
-  selector: '[vodzooFormField]',
-  exportAs: 'vodzooFormField',
+  selector: '[vFormField]',
+  exportAs: 'vFormField',
   standalone: true,
   providers: [
     {
@@ -28,7 +28,7 @@ import {Observable, Subject, tap} from "rxjs";
     }
   ]
 })
-export class FormFieldDirective<T extends any> implements ControlValueAccessor, Validator {
+export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
   /**
    * ------------------------------------
    * Injected services
@@ -51,10 +51,12 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
   private _formControlName: string = '';
   private _value: T | null = null;
   private _isDisabled: boolean = false;
-  private _baseFormControl?: AbstractControl;
+  private _baseFormControl?: AbstractControl<T>;
+  private _baseFormControlReady$: Subject<AbstractControl<T>> = new Subject<AbstractControl<T>>();
   private _disabledStateChange$: Subject<boolean> = new Subject<boolean>();
   private _valueChange$: Subject<T> = new Subject<T>();
 
+  public readonly baseFormControlReady: Observable<AbstractControl<T>> = this._baseFormControlReady$.asObservable().pipe(take(1));
   public readonly disabledStateChange: Observable<boolean> = this._disabledStateChange$.asObservable();
   public readonly valueChange: Observable<T> = this._valueChange$.asObservable();
 
@@ -67,7 +69,7 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
    * ------------------------------------
    */
   @Input() public label: string = '';
-  @Input({transform: (value: unknown) => typeof value !== 'function' ? () => null : value}) public vodzooFormField?: (control: AbstractControl) => ValidationErrors | null;
+  @Input({transform: (value: unknown) => typeof value !== 'function' ? () => null : value}) public vFormField?: (control: AbstractControl<T>) => ValidationErrors | null;
 
 
 
@@ -107,8 +109,8 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
     return this._isDisabled;
   };
 
-  public get baseControl(): FormControl | undefined {
-    return this._baseFormControl as FormControl | undefined;
+  public get baseControl(): FormControl<T> | undefined {
+    return this._baseFormControl as FormControl<T> | undefined;
   }
 
 
@@ -177,19 +179,20 @@ export class FormFieldDirective<T extends any> implements ControlValueAccessor, 
    * ------------------------------------
    * @param control
    */
-  public validate(control: AbstractControl): ValidationErrors | null {
+  public validate(control: AbstractControl<T>): ValidationErrors | null {
     if (!this._formControlName) {
-     this._formControlName = getControlName(control);
-     this._baseFormControl = control;
+      this._formControlName = getControlName(control);
+      this._baseFormControl = control;
+      this._baseFormControlReady$.next(control);
     }
-    this._fieldRequired = control.hasValidator(Validators.required);
+    this._fieldRequired = control.hasValidator(Validators.required) || control.hasValidator(Validators.requiredTrue);
 
-    // when used as vodzooFormField directive eg.
-    // <button vodzooFormField #field="vodzooFormField" ...>Button</button>
+    // when used as vFormField directive eg.
+    // <button vFormField #field="vFormField" ...>Button</button>
     // you can provide your own method for validation (default is () => null)
-    if (this.vodzooFormField !== undefined) {
+    if (this.vFormField !== undefined) {
       this.cdr.markForCheck();
-      return this.vodzooFormField(control);
+      return this.vFormField(control);
     }
 
     if (this.formControl.dirty && control.pristine) {

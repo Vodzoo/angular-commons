@@ -30,8 +30,8 @@ export interface FormConfigurationConfig {
 
 
 @Directive({
-  selector: '[vodzooFormConfig]',
-  exportAs: 'vodzooFormConfig',
+  selector: '[vFormConfig]',
+  exportAs: 'vFormConfig',
   standalone: true
 })
 export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnInit, OnDestroy {

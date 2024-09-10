@@ -11,8 +11,8 @@ export interface FormEvent<T, R extends string, V> {
 }
 
 @Directive({
-  selector: '[vodzooFormEvents]',
-  exportAs: 'vodzooFormEvents',
+  selector: '[vFormEvents]',
+  exportAs: 'vFormEvents',
   standalone: true
 })
 export class FormEventsDirective {

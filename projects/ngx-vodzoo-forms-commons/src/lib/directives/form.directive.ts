@@ -54,8 +54,8 @@ export interface FormConfig {
 }
 
 @Directive({
-  selector: '[vodzooForm]',
-  exportAs: 'vodzooForm',
+  selector: '[vForm]',
+  exportAs: 'vForm',
   standalone: true
 })
 export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnInit {
