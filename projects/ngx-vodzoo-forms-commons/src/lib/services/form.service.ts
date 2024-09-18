@@ -8,7 +8,7 @@ import {
 } from '../directives/form.directive';
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {markAsUiChange} from "../directives/form-field.directive";
-import {FormControlsConfig, FormFieldConfigFn} from "../directives/form-config.directive";
+import {FormControlsConfig, FormFieldConfigFn, FormControlsLogic} from "../directives/form-config.directive";
 import {setConfig, setDefaultConfig} from "../formConfig";
 import {mergeDeep} from "../mergeDeep";
 
@@ -180,6 +180,11 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
+  public getFormFieldsLogic(): FormControlsLogic<T, UserConfig, UserTypes> {
+    return this.formFieldsLogic();
+  }
+
+
   public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; }): FormControlsConfig<T, UserConfig, UserTypes> {
     const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.getFormFieldsConfig();
     const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {};
@@ -193,7 +198,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
         const mergedFn: FormFieldConfigFn<T, UserConfig, UserTypes> = (control: FormGroup<T>, config: any, index?: number): any => {
           const defaultFieldConfig = defaultValue(control, config, index) ?? {};
           const newFieldConfig = newValue(control, config, index) ?? {};
-          return mergeDeep(defaultFieldConfig, newFieldConfig, opts?.mergeArrays);
+          return mergeDeep(defaultFieldConfig, newFieldConfig, opts);
         };
         (mergedConfig as any)[key] = mergedFn;
       } else {
@@ -201,6 +206,12 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
       }
     })
     return mergedConfig;
+  }
+
+
+  public mergeLogicWith(newLogic: FormControlsLogic<T, UserConfig, UserTypes>): FormControlsLogic<T, UserConfig, UserTypes> {
+    const defaultLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.getFormFieldsLogic();
+    return mergeDeep(defaultLogic, newLogic);
   }
 
 
@@ -216,6 +227,11 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
   protected formFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
     console.warn('NYI, returning empty config!')
+    return {};
+  }
+
+
+  protected formFieldsLogic(): FormControlsLogic<T, UserConfig, UserTypes> {
     return {};
   }
 

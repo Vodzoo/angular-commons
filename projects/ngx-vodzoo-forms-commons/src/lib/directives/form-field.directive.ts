@@ -1,4 +1,13 @@
-import {ChangeDetectorRef, Directive, forwardRef, HostBinding, inject, InjectionToken, Input} from '@angular/core';
+import {
+  ChangeDetectorRef,
+  DestroyRef,
+  Directive,
+  forwardRef,
+  HostBinding,
+  inject,
+  InjectionToken,
+  Input
+} from '@angular/core';
 import {
   AbstractControl,
   ControlValueAccessor,
@@ -9,7 +18,8 @@ import {
   Validator,
   Validators
 } from "@angular/forms";
-import {BehaviorSubject, filter, Observable, Subject, take, tap} from "rxjs";
+import {BehaviorSubject, filter, Observable, startWith, Subject, take, tap} from "rxjs";
+import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 
 @Directive({
   selector: '[vFormField]',
@@ -37,6 +47,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
    */
   private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
   private config: FormFieldConfig<T> = inject(FORM_FIELD_CONFIG);
+  private destroyRef = inject(DestroyRef);
 
 
 
@@ -207,22 +218,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
       return null;
     }
 
-    //set timeout required
-    setTimeout(() => {
-      let allErrors: ValidationErrors | null = control.errors;
-      const localControlErrors: ValidationErrors | null = this.formControl.errors;
-      if (localControlErrors) {
-        allErrors = {...allErrors, ...localControlErrors};
-      }
-      this.formControl.setErrors(allErrors, {emitEvent: false});
-
-      const errors: ValidationErrors | null = this.formControl.errors;
-      if (this.formControl.pristine && this.formControl.untouched && errors && this.config.enableTouchOnInitialError(this.formControl, this.formControlName)) {
-        this.formControl.markAsTouched({onlySelf: true});
-      }
-      this.cdr.markForCheck();
-    });
-
+    this.cdr.markForCheck();
     return this.formControl.errors;
   }
 
@@ -235,6 +231,26 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
       this._formControlName = getControlName(control);
       this._baseFormControl = control;
       this._baseFormControlReady$.next(control);
+      setTimeout(() => {
+        control.statusChanges
+          .pipe(
+            startWith(control.status),
+            tap(() => {
+              let allErrors: ValidationErrors | null = control.errors;
+              const localControlErrors: ValidationErrors | null = this.formControl.errors;
+              if (localControlErrors) {
+                allErrors = {...allErrors, ...localControlErrors};
+              }
+              this.formControl.setErrors(allErrors, {emitEvent: false});
+              const errors: ValidationErrors | null = this.formControl.errors;
+              if (this.formControl.pristine && this.formControl.untouched && errors && this.config.enableTouchOnInitialError(this.formControl, this.formControlName)) {
+                this.formControl.markAsTouched({onlySelf: true});
+              }
+              this.cdr.markForCheck();
+            }),
+            takeUntilDestroyed(this.destroyRef)
+          ).subscribe();
+      });
     }
   }
 
