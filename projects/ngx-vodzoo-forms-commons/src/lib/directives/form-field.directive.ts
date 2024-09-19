@@ -1,12 +1,12 @@
 import {
   ChangeDetectorRef,
-  DestroyRef,
   Directive,
   forwardRef,
   HostBinding,
   inject,
   InjectionToken,
-  Input
+  Input,
+  OnDestroy
 } from '@angular/core';
 import {
   AbstractControl,
@@ -18,8 +18,7 @@ import {
   Validator,
   Validators
 } from "@angular/forms";
-import {BehaviorSubject, filter, Observable, startWith, Subject, take, tap} from "rxjs";
-import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
+import {BehaviorSubject, filter, Observable, startWith, Subject, take, takeUntil, tap} from "rxjs";
 
 @Directive({
   selector: '[vFormField]',
@@ -38,7 +37,7 @@ import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
     }
   ]
 })
-export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
+export class FormFieldDirective<T> implements ControlValueAccessor, Validator, OnDestroy {
   /**
    * ------------------------------------
    * Injected services
@@ -47,7 +46,6 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
    */
   private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
   private config: FormFieldConfig<T> = inject(FORM_FIELD_CONFIG);
-  private destroyRef = inject(DestroyRef);
 
 
 
@@ -67,6 +65,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
   private _disabledStateChange$: Subject<boolean> = new Subject();
   private _valueChange$: Subject<T> = new Subject();
   private _validate$: Subject<FormFieldValidation<T>> = new Subject();
+  private _destroy$: Subject<void> = new Subject();
 
   public readonly baseFormControlReady: Observable<AbstractControl<T>> = this._baseFormControlReady$.asObservable()
     .pipe(filter(Boolean), take(1));
@@ -128,6 +127,9 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
   }
 
 
+  public ngOnDestroy() {
+    this._destroy$.next();
+  }
 
 
   /**
@@ -248,7 +250,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator {
               }
               this.cdr.markForCheck();
             }),
-            takeUntilDestroyed(this.destroyRef)
+            takeUntil(this._destroy$)
           ).subscribe();
       });
     }
