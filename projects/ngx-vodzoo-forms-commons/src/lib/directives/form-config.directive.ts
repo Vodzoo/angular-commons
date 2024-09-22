@@ -100,7 +100,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   }
 
   @Input()
-  public set formFieldLogic(value: FormControlsLogic<T, UserConfig, UserTypes> | undefined) {
+  public set formControlsLogic(value: FormControlsLogic<T, UserConfig, UserTypes> | undefined) {
     this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { immutable: true }));
   }
 
@@ -202,34 +202,63 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     Object.keys(logic).forEach((key: string) => {
       const fieldLogic: FormFieldLogic<T, UserConfig, UserTypes> = (logic as any)[key];
       switch (phase) {
-        case 'init': {
-          if (subphase === 'beforeConfig') {
-            fieldLogic.onInit?.beforeConfig?.(this.formDirective.form);
-          } else if (subphase === 'afterConfig' && config) {
-            fieldLogic.onInit?.afterConfig?.(this.formDirective.form, config);
-          }
+        case 'init':
+          this.initLogic(fieldLogic, subphase, config)
           break;
-        }
-        case 'config': {
-          if (subphase === 'beforeConfig') {
-            fieldLogic.onConfigChange?.beforeConfig?.(this.formDirective.form);
-          } else if (subphase === 'afterConfig' && config) {
-            fieldLogic.onConfigChange?.afterConfig?.(this.formDirective.form, config);
-          }
+        case 'config':
+          this.configChange(fieldLogic, subphase, config);
           break;
-        }
-        case 'value': {
-          if (subphase === 'beforeConfig') {
-            fieldLogic.onValueChange?.beforeConfig?.(this.formDirective.form);
-          } else if (subphase === 'afterConfig' && config) {
-            fieldLogic.onValueChange?.afterConfig?.(this.formDirective.form, config);
-          }
+        case 'value':
+          this.valueChange(fieldLogic, subphase, config);
           break;
-        }
         default:
           break;
       }
     })
+  }
+
+  private initLogic(
+    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
+    subphase: 'beforeConfig' | 'afterConfig',
+    config?: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
+    if (subphase === 'beforeConfig') {
+      fieldLogic.onInit?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
+    } else if (subphase === 'afterConfig') {
+      if (!config) {
+        throw new Error('No config!');
+      }
+      fieldLogic.onInit?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
+    }
+  }
+
+  private configChange(
+    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
+    subphase: 'beforeConfig' | 'afterConfig',
+    config?: FormControlsConfigChange<T, UserConfig, UserTypes>
+  ): void {
+    if (subphase === 'beforeConfig') {
+      fieldLogic.onConfigChange?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
+    } else if (subphase === 'afterConfig') {
+      if (!config) {
+        throw new Error('No config!');
+      }
+      fieldLogic.onConfigChange?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
+    }
+  }
+
+  private valueChange(
+    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
+    subphase: 'beforeConfig' | 'afterConfig',
+    config?: FormControlsConfigChange<T, UserConfig, UserTypes>
+  ): void {
+    if (subphase === 'beforeConfig') {
+      fieldLogic.onValueChange?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
+    } else if (subphase === 'afterConfig') {
+      if (!config) {
+        throw new Error('No config!');
+      }
+      fieldLogic.onValueChange?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
+    }
   }
 
   private setConfigChange(value: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
@@ -287,15 +316,17 @@ type RecursivePartialFormControlsLogic<T, UserConfig, UserTypes> = {
 type ValueFormFieldLogic<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldLogic<any, UserConfig, UserTypes> : RecursivePartialFormControlsLogic<T, UserConfig, UserTypes>;
 export interface FormFieldLogic<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
   onInit?: {
-    beforeConfig?: (form: FormGroup<T>) => void;
-    afterConfig?: (form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>) => void;
+    beforeConfig?: FormFieldLogicBeforeFn<T>;
+    afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
   }
   onConfigChange?: {
-    beforeConfig?: (form: FormGroup<T>) => void;
-    afterConfig?: (form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>) => void;
+    beforeConfig?: FormFieldLogicBeforeFn<T>;
+    afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
   }
   onValueChange?: {
-    beforeConfig?: (form: FormGroup<T>) => void;
-    afterConfig?: (form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>) => void;
+    beforeConfig?: FormFieldLogicBeforeFn<T>;
+    afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
   }
 }
+export type FormFieldLogicBeforeFn<T extends { [K in keyof T]: AbstractControl }> = (form: FormGroup<T>, index?: number) => void;
+export type FormFieldLogicAfterFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>, index?: number) => void;
