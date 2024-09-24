@@ -10,7 +10,7 @@ import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {markAsUiChange} from "../directives/form-field.directive";
 import {FormControlsConfig, FormFieldConfigFn, FormControlsLogic} from "../directives/form-config.directive";
 import {setConfig, setDefaultConfig} from "../formConfig";
-import {mergeDeep} from "../mergeDeep";
+import {MERGE_CONFIG, MergeConfig, mergeDeep} from "../mergeDeep";
 
 export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('storage', {
   factory: () => sessionStorage
@@ -43,6 +43,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   protected fb: FormBuilder = inject(FormBuilder);
   private storage: Storage = inject(STORAGE);
   private formServiceConfig: FormServiceConfig = inject(FORM_SERVICE_CONFIG);
+  private mergeConfig: MergeConfig = inject(MERGE_CONFIG);
 
 
 
@@ -185,7 +186,13 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; }): FormControlsConfig<T, UserConfig, UserTypes> {
+  public mergeInitialValueWith(newValue: FormValue<T, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }): FormValue<T, UserTypes> {
+    const defaultValue: FormValue<T, UserTypes> = this.getFormGroup().getRawValue();
+    return mergeDeep(defaultValue, newValue, {...this.mergeConfig, ...opts});
+  }
+
+
+  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }): FormControlsConfig<T, UserConfig, UserTypes> {
     const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.getFormFieldsConfig();
     const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {};
 
@@ -198,7 +205,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
         const mergedFn: FormFieldConfigFn<T, UserConfig, UserTypes> = (control: FormGroup<T>, config: any, index?: number): any => {
           const defaultFieldConfig = defaultValue(control, config, index) ?? {};
           const newFieldConfig = newValue(control, config, index) ?? {};
-          return mergeDeep(defaultFieldConfig, newFieldConfig, opts);
+          return mergeDeep(defaultFieldConfig, newFieldConfig, {...this.mergeConfig, ...opts});
         };
         (mergedConfig as any)[key] = mergedFn;
       } else {

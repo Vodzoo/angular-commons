@@ -5,7 +5,7 @@ import {FormService} from "../services/form.service";
 import {BehaviorSubject, debounceTime, distinctUntilChanged, Observable, tap} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {setConfig} from "../formConfig";
-import {mergeDeep} from "../mergeDeep";
+import {MERGE_CONFIG, MergeConfig, mergeDeep} from "../mergeDeep";
 
 
 export const RECALCULATE_CONFIG: InjectionToken<readonly RecalculateConfig[]> = new InjectionToken<readonly RecalculateConfig[]>('RECALCULATE_CONFIG');
@@ -45,6 +45,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   private formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
   private destroyRef: DestroyRef = inject(DestroyRef);
   private formConfigurationConfig: FormConfigurationConfig = inject(FORM_CONFIGURATION_CONFIG);
+  private mergeConfig: MergeConfig = inject(MERGE_CONFIG);
 
   constructor() {
     this.formService.recalculateMethods.push(this.recalculateConfig);
@@ -93,7 +94,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
     const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
     const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(value);
-    const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange);
+    const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
     this.runLogic(this._formFieldLogic.value, this._initialRecalculate ? 'config' : 'init', 'afterConfig', merged);
     this.setConfigChange(merged);
     this._initialRecalculate = true;
@@ -101,7 +102,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
 
   @Input()
   public set formControlsLogic(value: FormControlsLogic<T, UserConfig, UserTypes> | undefined) {
-    this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { immutable: true }));
+    this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { ...this.mergeConfig, immutable: true }));
   }
 
 
@@ -136,7 +137,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
       this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
       const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
       const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-      const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange)
+      const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
       this.runLogic(this._formFieldLogic.value, 'init', 'afterConfig', merged);
       this.setConfigChange(merged);
     }
@@ -165,7 +166,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
         this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
         const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
         const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-        const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange)
+        const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
         this.runLogic(this._formFieldLogic.value, 'value', 'afterConfig', merged);
         this.setConfigChange(merged);
       }),
