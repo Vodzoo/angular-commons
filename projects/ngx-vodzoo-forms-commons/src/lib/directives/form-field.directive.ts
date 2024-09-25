@@ -151,6 +151,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
     this._onChange = fn;
     this.formControl.valueChanges
       .pipe(
+        filter(value => value !== this._value),
         tap(() => {
           if (isChangedByUiUnset(this.formControl)) {
             markAsUiChange(this._baseFormControl);
@@ -170,9 +171,9 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   public writeValue(obj: T): void {
     this._value = obj;
     if (isResetChange(this.baseControl)) {
-      this.formControl.reset(obj, {emitEvent: false, onlySelf: true});
+      this.formControl.reset(obj, {onlySelf: true});
     } else {
-      this.formControl.patchValue(obj, {emitEvent: false, onlySelf: true});
+      this.formControl.patchValue(obj, {onlySelf: true});
     }
     if (this._valueChange$.observed) {
       this._valueChange$.next(obj);
