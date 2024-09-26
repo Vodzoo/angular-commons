@@ -15,7 +15,7 @@ import {
   NG_VALIDATORS,
   NG_VALUE_ACCESSOR,
   ValidationErrors,
-  Validator,
+  Validator, ValidatorFn,
   Validators
 } from "@angular/forms";
 import {BehaviorSubject, filter, Observable, startWith, Subject, take, takeUntil, tap} from "rxjs";
@@ -226,7 +226,9 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   }
 
   private checkRequired(control: AbstractControl<T>): void {
-    this._fieldRequired = control.hasValidator(Validators.required) || control.hasValidator(Validators.requiredTrue);
+    this._fieldRequired = control.hasValidator(Validators.required)
+      || control.hasValidator(Validators.requiredTrue)
+      || !!this.config.requiredValidators?.some(validator => control.hasValidator(validator));
   }
 
   private setInitial(control: AbstractControl<T>): void {
@@ -288,15 +290,16 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
 export const uiChange: unique symbol = Symbol('uiChange');
 export const resetChange: unique symbol = Symbol('resetChange');
-export const FORM_FIELD_CONFIG: InjectionToken<FormFieldConfig<any>> = new InjectionToken<FormFieldConfig<any>>('formFieldConfig', {
-  factory: () => ({
-    enableTouchOnInitialError: (control) => {
-      if (Array.isArray(control.value)) {
-        return !!control.value.length;
-      }
-      return !!control.value || control.value === false || control.value === 0
+export const DEFAULT_FORM_FIELD_CONFIG: FormFieldConfig<any> = {
+  enableTouchOnInitialError: (control) => {
+    if (Array.isArray(control.value)) {
+      return !!control.value.length;
     }
-  })
+    return !!control.value || control.value === false || control.value === 0
+  }
+}
+export const FORM_FIELD_CONFIG: InjectionToken<FormFieldConfig<any>> = new InjectionToken<FormFieldConfig<any>>('formFieldConfig', {
+  factory: () => DEFAULT_FORM_FIELD_CONFIG
 });
 
 
@@ -393,6 +396,7 @@ export interface FormField<T> {
 
 export interface FormFieldConfig<T> {
   enableTouchOnInitialError: (control: FormControl<T>, controlName: string) => boolean;
+  requiredValidators?: ValidatorFn[];
 }
 
 export interface FormFieldValidation<T> {
