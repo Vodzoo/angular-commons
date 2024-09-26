@@ -60,6 +60,8 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   private _formControlName: string = '';
   private _value: T | null = null;
   private _isDisabled: boolean = false;
+  private _skip: boolean = false;
+  private _changeRegistered: boolean = false;
   private _baseFormControl?: AbstractControl<T>;
   private _baseFormControlReady$: BehaviorSubject<AbstractControl<T> | null> = new BehaviorSubject<AbstractControl<T> | null>(null);
   private _disabledStateChange$: Subject<boolean> = new Subject();
@@ -151,15 +153,24 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
     this._onChange = fn;
     this.formControl.valueChanges
       .pipe(
-        filter(value => value !== this._value),
         tap(() => {
+          if (this._skip) {
+            return;
+          }
           if (isChangedByUiUnset(this.formControl)) {
             markAsUiChange(this._baseFormControl);
           }
           resetUiChange(this.formControl);
         })
       )
-      .subscribe(fn);
+      .subscribe(value => {
+        if (this._skip) {
+          this._skip = false;
+          return;
+        }
+        fn(value);
+      });
+    this._changeRegistered = true;
   }
 
 
@@ -170,6 +181,9 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
   public writeValue(obj: T): void {
     this._value = obj;
+    if (this._changeRegistered) {
+      this._skip = true;
+    }
     if (isResetChange(this.baseControl)) {
       this.formControl.reset(obj, {onlySelf: true});
     } else {
