@@ -1,4 +1,4 @@
-import {inject, Injectable, InjectionToken, OnDestroy} from '@angular/core';
+import {computed, inject, Injectable, InjectionToken, OnDestroy, Signal} from '@angular/core';
 import {AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, ValidatorFn} from '@angular/forms';
 import {
   FormDisabledState,
@@ -73,6 +73,13 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   private formValuesChanges$: BehaviorSubject<Map<string, FormValues<T, UserTypes>>> = new BehaviorSubject(this.formValues);
 
 
+  /**
+   * Signals
+   */
+
+  public reloadConfigSignals: Signal<boolean> = computed((): boolean => {
+    return false;
+  });
 
 
   /**

@@ -1,4 +1,13 @@
-import {DestroyRef, Directive, inject, InjectionToken, Input, OnDestroy, OnInit} from '@angular/core';
+import {
+  DestroyRef,
+  Directive,
+  effect,
+  inject,
+  InjectionToken,
+  Input,
+  OnDestroy,
+  OnInit
+} from '@angular/core';
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {FormService} from "../services/form.service";
@@ -78,6 +87,15 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this.formControlsConfig = this._formControlsConfig;
   }
 
+  /**
+   * Effects
+   */
+
+  private reloadConfig = effect(() => {
+    if (this.formService.reloadConfigSignals()) {
+      this.recalculateConfig();
+    }
+  })
 
 
 
