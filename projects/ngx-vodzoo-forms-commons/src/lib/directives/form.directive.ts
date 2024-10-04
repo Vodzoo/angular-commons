@@ -22,9 +22,10 @@ import {
   ValidatorFn
 } from "@angular/forms";
 import {FormService, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
-import {filter, map, Observable, pairwise, startWith, tap} from "rxjs";
+import {debounceTime, filter, map, Observable, pairwise, startWith, tap} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {
+  getLabel,
   isDataChangedByUi,
   markAsResetChange,
   markAsUiChange,
@@ -136,6 +137,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   @Output() public formCreated: EventEmitter<FormGroup<T>> = new EventEmitter(); // root form only
   @Output() public valueChanged: EventEmitter<ValueChanges<T, UserTypes>> = new EventEmitter(); // root form only
   @Output() public statusChanged: EventEmitter<StatusChanges> = new EventEmitter(); // root form only
+  @Output() public invalidFields: EventEmitter<string[]> = new EventEmitter(); // root form only
   @Output() public eventEmitted: EventEmitter<FormEvent<any, string, any>> = new EventEmitter(); // root form only
 
 
@@ -192,6 +194,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     this.initServiceComponentId();
 
     this.handleStatusChanges().subscribe();
+    this.handleInvalidFieldsChanges().subscribe();
     this.handleValueChanges().subscribe();
     this.handlePatchFormValueChanges().subscribe();
 
@@ -309,6 +312,49 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
         tap(value => this.statusChanged.emit(value)),
         takeUntilDestroyed(this.destroyRef)
       );
+  }
+
+
+  private handleInvalidFieldsChanges(): Observable<string[]> {
+    return this.form.statusChanges
+      .pipe(
+        startWith(this.form.status),
+        tap(() => this.cdr.markForCheck()),
+        filter(() => this.invalidFields.observed && this.rootForm),
+        debounceTime(0),
+        map(value => value === 'VALID' ? [] : this.getLabels(this.findInvalidControls(this.form))),
+        tap(value => this.invalidFields.emit(value)),
+        takeUntilDestroyed(this.destroyRef)
+      );
+  }
+
+  private findInvalidControls(group: FormGroup | FormArray): AbstractControl[] {
+    let invalidControls: AbstractControl[] = [];
+
+    if (group instanceof FormGroup) {
+      Object.keys(group.controls).forEach(key => {
+        const control = group.get(key);
+        if (control instanceof FormGroup || control instanceof FormArray) {
+          invalidControls = [...invalidControls, ...this.findInvalidControls(control)];
+        } else if (control?.invalid) {
+          invalidControls.push(control);
+        }
+      });
+    } else {
+      group.controls.forEach(control => {
+        if (control instanceof FormGroup || control instanceof FormArray) {
+          invalidControls = [...invalidControls, ...this.findInvalidControls(control)];
+        } else if (control?.invalid) {
+          invalidControls.push(control);
+        }
+      });
+    }
+
+    return invalidControls;
+  }
+
+  private getLabels(controls: AbstractControl[]): string[] {
+    return controls.map(getLabel).filter(Boolean);
   }
 
 

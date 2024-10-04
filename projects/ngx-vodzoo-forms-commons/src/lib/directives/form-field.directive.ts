@@ -15,7 +15,8 @@ import {
   NG_VALIDATORS,
   NG_VALUE_ACCESSOR,
   ValidationErrors,
-  Validator, ValidatorFn,
+  Validator,
+  ValidatorFn,
   Validators
 } from "@angular/forms";
 import {BehaviorSubject, filter, Observable, startWith, Subject, take, takeUntil, tap} from "rxjs";
@@ -83,7 +84,14 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    * Inputs
    * ------------------------------------
    */
-  @Input() public label: string = '';
+  private _label: string = '';
+  @Input() public set label(value: string) {
+    this._label = value;
+    setLabel(this.baseControl, this.label);
+  };
+  public get label(): string {
+    return this._label;
+  };
   @Input({transform: (value: unknown) => typeof value !== 'function' ? () => null : value}) public vFormField?: (control: AbstractControl<T>) => ValidationErrors | null;
 
 
@@ -100,8 +108,9 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
     return this._formControlName;
   };
 
-
-
+  constructor() {
+    this.baseFormControlReady.subscribe(control => setLabel(control, this.label));
+  }
 
   /**
    * ------------------------------------
@@ -304,6 +313,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
 export const uiChange: unique symbol = Symbol('uiChange');
 export const resetChange: unique symbol = Symbol('resetChange');
+export const controlLabel: unique symbol = Symbol('controlLabel');
 export const DEFAULT_FORM_FIELD_CONFIG: FormFieldConfig<any> = {
   enableTouchOnInitialError: (control) => {
     if (Array.isArray(control.value)) {
@@ -322,6 +332,20 @@ export function getControlName(control: AbstractControl): string {
     return '';
   }
   return Object.entries(control.parent.controls).find(entry => entry[1] === control)?.[0] ?? '';
+}
+
+
+/**
+ * Form field label functions
+ */
+function setLabel(control?: AbstractControl, label?: string): void {
+  if (control && label) {
+    (control as any)[controlLabel] = label;
+  }
+}
+
+export function getLabel(control?: AbstractControl): string {
+  return (control as any)?.[controlLabel] ?? '';
 }
 
 
