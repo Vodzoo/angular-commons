@@ -320,7 +320,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
       .pipe(
         startWith(this.form.status),
         tap(() => this.cdr.markForCheck()),
-        filter(() => this.invalidFields.observed && this.rootForm),
+        filter(() => this.invalidFields.observed),
         debounceTime(0),
         map(value => value === 'VALID' ? [] : this.getLabels(this.findInvalidControls(this.form))),
         tap(value => this.invalidFields.emit(value)),
