@@ -100,7 +100,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   @Input() public initialValidators?: FormValidators<T, UserTypes>; // root form only, works on init only
   @Input() public saveDataWithService?: boolean = this.formConfig.saveDataWithService; // root form only
   @Input() public saveInStorage?: boolean = this.formConfig.saveInStorage; // root form only
-  @Input() public clearForm?: Observable<{ value?: FormValue<T, UserTypes>, options?: { onlySelf?: boolean; emitEvent?: boolean; } } | undefined>; // root form only, works on init only
+  @Input() public clearForm?: Observable<{ value?: FormValue<T, UserTypes>, options?: { onlySelf?: boolean; emitEvent?: boolean; } } | undefined>; // works on init only
   @Input() public clearFormWithInitialData?: boolean = this.formConfig.clearFormWithInitialData; // initial data or form group data
   @Input() public set initialData(value: FormValue<T, UserTypes> | undefined) {
     if (this._initialData || !value) {
@@ -397,7 +397,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
 
   private initClearForm() {
-    if (!(this.clearForm && this.rootForm)) {
+    if (!this.clearForm) {
       return;
     }
     this.clearForm
