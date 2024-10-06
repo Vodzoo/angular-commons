@@ -1,27 +1,25 @@
 import {
+  computed,
   DestroyRef,
   Directive,
   effect,
   inject,
   InjectionToken,
-  Input,
-  OnDestroy,
-  OnInit
+  Injector,
+  input,
+  OnInit,
+  runInInjectionContext,
+  Signal,
+  signal,
 } from '@angular/core';
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
-import {FormDirective, FormRawValue} from "./form.directive";
+import {FormDirective, FormRawValue, FormValue} from "./form.directive";
 import {FormService} from "../services/form.service";
-import {BehaviorSubject, debounceTime, distinctUntilChanged, Observable, tap} from "rxjs";
-import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
+import {distinctUntilChanged} from "rxjs";
+import {takeUntilDestroyed, toSignal} from "@angular/core/rxjs-interop";
 import {setConfig} from "../formConfig";
 import {MERGE_CONFIG, MergeConfig, mergeDeep} from "../mergeDeep";
 
-
-export const RECALCULATE_CONFIG: InjectionToken<readonly RecalculateConfig[]> = new InjectionToken<readonly RecalculateConfig[]>('RECALCULATE_CONFIG');
-
-export interface RecalculateConfig {
-  registerRecalculate(fn: (service?: FormService<any, any, any>) => void): void;
-}
 
 export const DEFAULT_FORM_CONFIGURATION_CONFIG: FormConfigurationConfig = {
   alwaysTrackConfigChange: true,
@@ -43,7 +41,7 @@ export interface FormConfigurationConfig {
   exportAs: 'vFormConfig',
   standalone: true
 })
-export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnInit, OnDestroy {
+export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnInit {
   /**
    * ------------------------------------
    * Injected services
@@ -52,16 +50,10 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    */
   private formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
   private formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
-  private destroyRef: DestroyRef = inject(DestroyRef);
   private formConfigurationConfig: FormConfigurationConfig = inject(FORM_CONFIGURATION_CONFIG);
   private mergeConfig: MergeConfig = inject(MERGE_CONFIG);
-
-  constructor() {
-    this.formService.recalculateMethods.push(this.recalculateConfig);
-    inject(RECALCULATE_CONFIG, {optional: true})?.forEach(rc => rc.registerRecalculate(this.recalculateConfig));
-  }
-
-
+  private injector = inject(Injector);
+  private destroyRef = inject(DestroyRef);
 
 
   /**
@@ -69,34 +61,55 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Fields
    * ------------------------------------
    */
-  private _defaultFormFieldsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.formService.getFormFieldsConfig();
-  private _defaultFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
-  private _defaultFormFieldLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.formService.getFormFieldsLogic();
-  private _formControlsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this._defaultFormFieldsConfig;
-  private _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
-  private _formFieldLogic: BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>>(this._defaultFormFieldLogic);
-  private _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
-  private _initialRecalculate: boolean = false;
-  public readonly controlsConfig: Observable<FormControlsConfig<T, UserConfig, UserTypes>> = this._controlsConfig$.asObservable();
-  public readonly controlsConfigChange: Observable<FormControlsConfigChange<T, UserConfig, UserTypes>> = this._formControlsConfigChange$.asObservable();
-  public readonly controlsLogic: Observable<FormControlsLogic<T, UserConfig, UserTypes>> = this._formFieldLogic.asObservable();
-  public readonly recalculateConfig = (service?: FormService<any, any, any>) => {
-    if (service && service !== this.formService) {
-      return;
-    }
-    this.formControlsConfig = this._formControlsConfig;
-  }
+  private formStatus: FormControlStatus = this.formDirective.form.status;
+  private prevousConfigChange?: FormControlsConfigChange<T, UserConfig, UserTypes>;
+
 
   /**
-   * Effects
+   * Signals
    */
+  private formValueChanges: Signal<FormValue<T, UserTypes> | undefined> = signal(undefined).asReadonly();
 
-  private reloadConfig = effect(() => {
-    if (this.formService.reloadConfigSignals()) {
-      this.recalculateConfig();
-    }
+  //config
+  private _defaultFormControlsConfig = computed((): FormControlsConfig<T, UserConfig, UserTypes> => {
+    return this.formService.getFormFieldsConfig();
+  });
+  private _formControlsConfig = computed((): FormControlsConfig<T, UserConfig, UserTypes> => {
+    const inputValue: FormControlsConfig<T, UserConfig, UserTypes> | undefined = this.formControlsConfigInput();
+    return !inputValue || Object.keys(inputValue).length === 0 ? this._defaultFormControlsConfig() : inputValue;
+  });
+
+  //config change
+  private _defaultFormControlsConfigChange = computed((): FormControlsConfigChange<T, UserConfig, UserTypes> => {
+    this.formValueChanges();
+    return this.mapConfigToChange(this._defaultFormControlsConfig(), this.formDirective.form, {}, this.formDirective.formIndex);
+  });
+  private _formControlsConfigChange = computed((): FormControlsConfigChange<T, UserConfig, UserTypes> => {
+    this.formValueChanges();
+    return this.mapConfigToChange(this._formControlsConfig(), this.formDirective.form, this._defaultFormControlsConfigChange(), this.formDirective.formIndex);
+  });
+
+  //logic
+  private _defaultFormControlsLogic = computed((): FormControlsLogic<T, UserConfig, UserTypes> => {
+    return this.formService.getFormFieldsLogic();
+  });
+  private _formControlsLogic = computed((): FormControlsLogic<T, UserConfig, UserTypes> => {
+    const inputValue: FormControlsLogic<T, UserConfig, UserTypes> | undefined = this.formControlsLogicInput();
+    return !inputValue || Object.keys(inputValue).length === 0 ? this._defaultFormControlsLogic() : inputValue;
+  });
+
+  //public signals
+  public controlsConfig = computed((): FormControlsConfig<T, UserConfig, UserTypes> => {
+    this.formValueChanges();
+    return mergeDeep({}, this._formControlsConfig(), {...this.mergeConfig, immutable: true});
+  });
+  public controlsConfigChange = computed((): FormControlsConfigChange<T, UserConfig, UserTypes> => {
+    return this._formControlsConfigChange();
+  });
+  public controlsLogic = computed((): FormControlsLogic<T, UserConfig, UserTypes> => {
+    this.formValueChanges();
+    return mergeDeep({}, this._formControlsLogic(), {...this.mergeConfig, immutable: true});
   })
-
 
 
   /**
@@ -104,101 +117,51 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Inputs
    * ------------------------------------
    */
-  @Input()
-  public set formControlsConfig(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined) {
-    this._formControlsConfig = !value || Object.keys(value).length === 0 ? this._defaultFormFieldsConfig : value;
-    this.setConfig(this._formControlsConfig);
-    this.runLogic(this._formFieldLogic.value, this._initialRecalculate ? 'config' : 'init', 'beforeConfig');
-    this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-    const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
-    const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(value);
-    const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
-    this.runLogic(this._formFieldLogic.value, this._initialRecalculate ? 'config' : 'init', 'afterConfig', merged);
-    this.setConfigChange(merged);
-    this._initialRecalculate = true;
-  }
-
-  @Input()
-  public set formControlsLogic(value: FormControlsLogic<T, UserConfig, UserTypes> | undefined) {
-    this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { ...this.mergeConfig, immutable: true }));
-  }
-
-
+  public formControlsConfigInput = input<FormControlsConfig<T, UserConfig, UserTypes> | undefined>(this._defaultFormControlsConfig(), {alias: 'formControlsConfig'});
+  public formControlsLogicInput = input<FormControlsLogic<T, UserConfig, UserTypes> | undefined>(this._defaultFormControlsLogic(), {alias: 'formControlsLogic'});
 
 
   /**
-   * ------------------------------------
-   * Getters
-   * ------------------------------------
+   * Hooks
    */
-  public get controlsConfigChangeValue(): FormControlsConfigChange<T, UserConfig, UserTypes> {
-    return this._formControlsConfigChange$.value;
+  public ngOnInit() {
+    runInInjectionContext(this.injector, () => {
+      this.formValueChanges = toSignal(this.formDirective.form.valueChanges.pipe(
+        distinctUntilChanged((prev, cur) => {
+          const curStatus: FormControlStatus = this.formDirective.form.status;
+          const statusChanged: boolean = curStatus !== this.formStatus;
+          if (statusChanged) {
+            this.formStatus = curStatus;
+            return false;
+          }
+          return this.formConfigurationConfig.equalFn(prev, cur);
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      ));
+    });
   }
-
-  public get controlsConfigValue(): FormControlsConfig<T, UserConfig, UserTypes> {
-    return this._controlsConfig$.value;
-  }
-
-
 
 
   /**
-   * ------------------------------------
-   * Lifecycle hooks
-   * ------------------------------------
+   * Effects
    */
-  public ngOnInit(): void {
-    if (!this._initialRecalculate) {
-      this._initialRecalculate = true;
-      this.setConfig(this._formControlsConfig);
-      this.runLogic(this._formFieldLogic.value, 'init', 'beforeConfig');
-      this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-      const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
-      const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-      const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
-      this.runLogic(this._formFieldLogic.value, 'init', 'afterConfig', merged);
-      this.setConfigChange(merged);
-    }
-    if (!this.formConfigurationConfig.alwaysTrackConfigChange && Object.keys(this.controlsConfigChangeValue).length === 0) {
-      return;
-    }
+  private setConfigEffect = effect(() => {
+    setConfig(this.formDirective.form, this.controlsConfig());
+  });
 
-    let status: FormControlStatus = this.formDirective.form.status;
-    this.formDirective.form.valueChanges.pipe(
-      debounceTime(0),
-      distinctUntilChanged((prev, cur) => {
-        const curStatus: FormControlStatus = this.formDirective.form.status;
-        const statusChanged: boolean = curStatus !== status;
-        if (statusChanged) {
-          status = curStatus;
-          return false;
-        }
-        if (prev === cur) {
-          return true;
-        }
-        return this.formConfigurationConfig.equalFn(prev, cur);
-      }),
-      tap(() => {
-        this.setConfig(this._formControlsConfig);
-        this.runLogic(this._formFieldLogic.value, 'value', 'beforeConfig');
-        this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-        const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
-        const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-        const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
-        this.runLogic(this._formFieldLogic.value, 'value', 'afterConfig', merged);
-        this.setConfigChange(merged);
-      }),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe();
-  }
-
-  public ngOnDestroy(): void {
-    const methods = this.formService.recalculateMethods.filter(method => method !== this.recalculateConfig);
-    this.formService.recalculateMethods.length = 0;
-    this.formService.recalculateMethods.push(...methods);
-  }
-
-
+  private initialLogicRun: boolean = true;
+  private runLogicEffect = effect(() => {
+    const logic: FormControlsLogic<T, UserConfig, UserTypes> = this.controlsLogic();
+    const currentConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.controlsConfigChange();
+    const defaultConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this._defaultFormControlsConfigChange();
+    this.runLogic(logic, {
+      default: defaultConfigChange,
+      current: currentConfigChange,
+      previous: this.prevousConfigChange ?? {}
+    });
+    this.initialLogicRun = false;
+    this.prevousConfigChange = currentConfigChange;
+  });
 
 
   /**
@@ -206,100 +169,37 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Other methods
    * ------------------------------------
    */
-  private mapConfigToChange(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined): FormControlsConfigChange<T, UserConfig, UserTypes> {
-    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = value !== this._defaultFormFieldsConfig ? {...this._defaultFormFieldsConfig, ...value} : value;
+  private mapConfigToChange(
+    config: FormControlsConfig<T, UserConfig, UserTypes>,
+    form: FormGroup<T>,
+    defaultConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes>,
+    formIndex?: number
+  ): FormControlsConfigChange<T, UserConfig, UserTypes> {
     const change: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
-    Object.keys(mergedConfig).forEach((key: string) => {
-      if ((typeof (mergedConfig as any)[key]) === 'function') {
-        (change as any)[key] = ((mergedConfig as any)[key] as FormFieldConfigFn<T, any, any>)(this.formDirective.form, this._defaultFormFieldsConfigChange, this.formDirective.formIndex);
+    Object.keys(config).forEach((key: string) => {
+      if ((typeof (config as any)[key]) === 'function') {
+        (change as any)[key] = ((config as any)[key] as FormFieldConfigFn<T, any, any>)(form, defaultConfigChange, formIndex);
       }
     })
     return change;
   }
 
-  private runLogic(logic: FormControlsLogic<T, UserConfig, UserTypes>, phase: 'init' | 'config' | 'value', subphase: 'beforeConfig' | 'afterConfig', config?: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
+  private runLogic(logic: FormControlsLogic<T, UserConfig, UserTypes>, config: FormFieldLogicFnConfig<T, UserConfig, UserTypes>): void {
     Object.keys(logic).forEach((key: string) => {
-      const fieldLogic: FormFieldLogic<T, UserConfig, UserTypes> = (logic as any)[key];
-      switch (phase) {
-        case 'init':
-          this.initLogic(fieldLogic, subphase, config)
-          break;
-        case 'config':
-          this.configChange(fieldLogic, subphase, config);
-          break;
-        case 'value':
-          this.valueChange(fieldLogic, subphase, config);
-          break;
-        default:
-          break;
+      const fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes> | object = (logic as any)[key];
+      if (typeof fieldLogic === 'function') {
+        fieldLogic(
+          {
+            form: this.formDirective.form,
+            config,
+            index: this.formDirective.formIndex,
+            initialLogicRun: this.initialLogicRun
+          }
+        );
       }
     })
   }
-
-  private initLogic(
-    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
-    subphase: 'beforeConfig' | 'afterConfig',
-    config?: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
-    if (subphase === 'beforeConfig') {
-      fieldLogic.onInit?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
-    } else if (subphase === 'afterConfig') {
-      if (!config) {
-        throw new Error('No config!');
-      }
-      fieldLogic.onInit?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
-    }
-  }
-
-  private configChange(
-    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
-    subphase: 'beforeConfig' | 'afterConfig',
-    config?: FormControlsConfigChange<T, UserConfig, UserTypes>
-  ): void {
-    if (subphase === 'beforeConfig') {
-      fieldLogic.onConfigChange?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
-    } else if (subphase === 'afterConfig') {
-      if (!config) {
-        throw new Error('No config!');
-      }
-      fieldLogic.onConfigChange?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
-    }
-  }
-
-  private valueChange(
-    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
-    subphase: 'beforeConfig' | 'afterConfig',
-    config?: FormControlsConfigChange<T, UserConfig, UserTypes>
-  ): void {
-    if (subphase === 'beforeConfig') {
-      fieldLogic.onValueChange?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
-    } else if (subphase === 'afterConfig') {
-      if (!config) {
-        throw new Error('No config!');
-      }
-      fieldLogic.onValueChange?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
-    }
-  }
-
-  private setConfigChange(value: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
-    this._formControlsConfigChange$.next(value);
-  }
-
-  private setLogic(value: FormControlsLogic<T, UserConfig, UserTypes>): void {
-    this._formFieldLogic.next(value);
-  }
-
-  private setConfig(value: FormControlsConfig<T, UserConfig, UserTypes>): void {
-    const config: any = value;
-    const newConfig: any = {};
-    Object.keys(config).forEach(key => {
-      newConfig[key] = typeof config[key] === 'function' ? config[key] : { ...config[key] };
-    });
-    setConfig(this.formDirective.form, newConfig);
-    this._controlsConfig$.next(newConfig);
-  }
 }
-
-
 
 
 /**
@@ -307,24 +207,24 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
  * Types
  * ------------------------------------
  */
-export type FormControlsConfig<T, UserConfig, UserTypes> = RecursivePartialFormFieldConfig<FormRawValue<T>, UserConfig, UserTypes>;
+export type FormControlsConfig<T, UserConfig, UserTypes> = RecursivePartialFormControlsConfig<FormRawValue<T>, UserConfig, UserTypes>;
 type AllowedTypes<UserTypes> = boolean | string | number | undefined | null | UserTypes;
-type RecursivePartialFormFieldConfig<T, UserConfig, UserTypes> = {
+type RecursivePartialFormControlsConfig<T, UserConfig, UserTypes> = {
   [P in keyof T]?:
   T[P] extends Array<infer U> ? ValueFormFieldConfigArray<U, UserConfig, UserTypes> : ValueFormFieldConfig<T[P], UserConfig, UserTypes>;
 };
 
-type ValueFormFieldConfig<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig, UserTypes> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
-type ValueFormFieldConfigArray<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig, UserTypes> : RecursivePartialFormFieldConfig<T, UserConfig, UserTypes>;
+type ValueFormFieldConfig<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig, UserTypes> : RecursivePartialFormControlsConfig<T, UserConfig, UserTypes>;
+type ValueFormFieldConfigArray<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldConfigFn<any, UserConfig, UserTypes> : RecursivePartialFormControlsConfig<T, UserConfig, UserTypes>;
 export type FormFieldConfigFn<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserConfig, UserTypes> = (control: FormGroup<T>, defaultConfig: FormControlsConfigChange<T, UserConfig, UserTypes>, index?: number) => UserConfig;
 
 
-export type FormControlsConfigChange<T, UserConfig, UserTypes> = RecursivePartialFormFieldConfigChange<FormRawValue<T>, UserConfig, UserTypes>;
-type RecursivePartialFormFieldConfigChange<T, UserConfig, UserTypes> = {
+export type FormControlsConfigChange<T, UserConfig, UserTypes> = RecursivePartialFormControlsConfigChange<FormRawValue<T>, UserConfig, UserTypes>;
+type RecursivePartialFormControlsConfigChange<T, UserConfig, UserTypes> = {
   [P in keyof T]?:
   T[P] extends Array<infer U> ? ValueFormFieldConfigChange<U, UserConfig, UserTypes> : ValueFormFieldConfigChange<T[P], UserConfig, UserTypes>;
 };
-type ValueFormFieldConfigChange<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? UserConfig : RecursivePartialFormFieldConfigChange<T, UserConfig, UserTypes>;
+type ValueFormFieldConfigChange<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? UserConfig : RecursivePartialFormControlsConfigChange<T, UserConfig, UserTypes>;
 
 
 export type FormControlsLogic<T, UserConfig, UserTypes> = RecursivePartialFormControlsLogic<FormRawValue<T>, UserConfig, UserTypes>;
@@ -332,20 +232,17 @@ type RecursivePartialFormControlsLogic<T, UserConfig, UserTypes> = {
   [P in keyof T]?:
   T[P] extends Array<infer U> ? ValueFormFieldLogic<U, UserConfig, UserTypes> : ValueFormFieldLogic<T[P], UserConfig, UserTypes>;
 };
-type ValueFormFieldLogic<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldLogic<any, UserConfig, UserTypes> : RecursivePartialFormControlsLogic<T, UserConfig, UserTypes>;
-export interface FormFieldLogic<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
-  onInit?: {
-    beforeConfig?: FormFieldLogicBeforeFn<T>;
-    afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
+type ValueFormFieldLogic<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldLogicFn<any, UserConfig, UserTypes> : RecursivePartialFormControlsLogic<T, UserConfig, UserTypes>;
+export type FormFieldLogicFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (
+  opts: {
+    form: FormGroup<T>;
+    config: FormFieldLogicFnConfig<T, UserConfig, UserTypes>;
+    index?: number;
+    initialLogicRun: boolean;
   }
-  onConfigChange?: {
-    beforeConfig?: FormFieldLogicBeforeFn<T>;
-    afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
-  }
-  onValueChange?: {
-    beforeConfig?: FormFieldLogicBeforeFn<T>;
-    afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
-  }
+) => void;
+export interface FormFieldLogicFnConfig<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
+  default: FormControlsConfigChange<T, UserConfig, UserTypes>;
+  current: FormControlsConfigChange<T, UserConfig, UserTypes>;
+  previous: FormControlsConfigChange<T, UserConfig, UserTypes>;
 }
-export type FormFieldLogicBeforeFn<T extends { [K in keyof T]: AbstractControl }> = (form: FormGroup<T>, index?: number) => void;
-export type FormFieldLogicAfterFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>, index?: number) => void;
