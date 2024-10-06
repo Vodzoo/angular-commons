@@ -46,8 +46,6 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   private mergeConfig: MergeConfig = inject(MERGE_CONFIG);
 
 
-
-
   /**
    * ------------------------------------
    * Fields
@@ -59,27 +57,11 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   public initialValue?: FormValue<T, UserTypes> | null;
   public initialDisabledState?: FormDisabledState<T, UserTypes> | null;
   public initialValidators?: FormValidators<T, UserTypes> | null;
-  /**
-   * for internal use only
-   */
-  public readonly recalculateMethods: Array<(service?: FormService<any, any, any>) => void> = [];
-  public readonly recalculateConfig = () => {
-    this.recalculateMethods.forEach(method => method());
-  };
   protected saveInStorage: boolean = true;
   protected removeFromStorageOnDestroy: boolean = true;
   private formValues: Map<string, FormValues<T, UserTypes>> = new Map();
-  private patchFormValue: Subject<{componentId: string, value: FormValue<T, UserTypes>}> = new Subject();
+  private patchFormValue: Subject<{ componentId: string, value: FormValue<T, UserTypes> }> = new Subject();
   private formValuesChanges$: BehaviorSubject<Map<string, FormValues<T, UserTypes>>> = new BehaviorSubject(this.formValues);
-
-
-  /**
-   * Signals
-   */
-
-  public reloadConfigSignals: Signal<boolean> = computed((): boolean => {
-    return false;
-  });
 
 
   /**
@@ -93,10 +75,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     if (this.removeFromStorageOnDestroy) {
       [...this.formValues.keys()].forEach(key => this.storage.removeItem(key));
     }
-    this.recalculateMethods.length = 0;
   }
-
-
 
 
   /**
@@ -131,7 +110,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  public get patchFormValueChanges(): Observable<{componentId: string, value: FormValue<T, UserTypes>}> {
+  public get patchFormValueChanges(): Observable<{ componentId: string, value: FormValue<T, UserTypes> }> {
     return this.patchFormValue.asObservable();
   }
 
@@ -183,24 +162,30 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  public getFormFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
+  public getFormFieldsConfig: Signal<FormControlsConfig<T, UserConfig, UserTypes>> = computed((): FormControlsConfig<T, UserConfig, UserTypes> => {
     return this.formFieldsConfig();
-  }
+  });
 
 
-  public getFormFieldsLogic(): FormControlsLogic<T, UserConfig, UserTypes> {
+  public getFormFieldsLogic: Signal<FormControlsLogic<T, UserConfig, UserTypes>> = computed((): FormControlsLogic<T, UserConfig, UserTypes> => {
     return this.formFieldsLogic();
-  }
+  });
 
 
-  public mergeInitialValueWith(newValue: FormValue<T, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }): FormValue<T, UserTypes> {
+  public mergeInitialValueWith(newValue: FormValue<T, UserTypes>, opts?: {
+    mergeArrays?: boolean;
+    skipMerging?: (target: any, source: any) => boolean
+  }): FormValue<T, UserTypes> {
     const defaultValue: FormValue<T, UserTypes> = this.getFormGroup().getRawValue();
     return mergeDeep(defaultValue, newValue, {...this.mergeConfig, ...opts});
   }
 
 
-  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }): FormControlsConfig<T, UserConfig, UserTypes> {
-    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.getFormFieldsConfig();
+  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: {
+    mergeArrays?: boolean;
+    skipMerging?: (target: any, source: any) => boolean
+  }): FormControlsConfig<T, UserConfig, UserTypes> {
+    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.getFormFieldsConfig() ?? {};
     const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {};
 
     Object.keys(defaultConfig).forEach(key => {
@@ -224,7 +209,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
   public mergeLogicWith(newLogic: FormControlsLogic<T, UserConfig, UserTypes>): FormControlsLogic<T, UserConfig, UserTypes> {
-    const defaultLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.getFormFieldsLogic();
+    const defaultLogic: FormControlsLogic<T, UserConfig, UserTypes> | null  = this.getFormFieldsLogic();
     return mergeDeep(defaultLogic, newLogic);
   }
 
@@ -239,15 +224,14 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  protected formFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
-    console.warn('NYI, returning empty config!')
+  protected formFieldsConfig: Signal<FormControlsConfig<T, UserConfig, UserTypes>> = computed((): FormControlsConfig<T, UserConfig, UserTypes> => {
     return {};
-  }
+  });
 
 
-  protected formFieldsLogic(): FormControlsLogic<T, UserConfig, UserTypes> {
+  protected formFieldsLogic: Signal<FormControlsLogic<T, UserConfig, UserTypes>> = computed((): FormControlsLogic<T, UserConfig, UserTypes> => {
     return {};
-  }
+  });
 
 
   /**
