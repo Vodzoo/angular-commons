@@ -77,7 +77,12 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
    * Signals
    */
 
-  public reloadConfigSignals: Signal<boolean> = computed((): boolean => {
+    // return different object/value (must resolve to true) every time config needs to be recalculated eg.
+    // public reloadConfigSignals: Signal<any> = computed((): any => {
+    //     this.mySignal();
+    //     return Date.now();
+    //   });
+  public reloadConfigSignals: Signal<any> = computed((): any => {
     return false;
   });
 

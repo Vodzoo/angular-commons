@@ -6,7 +6,8 @@ import {
   InjectionToken,
   Input,
   OnDestroy,
-  OnInit
+  OnInit,
+  untracked
 } from '@angular/core';
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
@@ -93,7 +94,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
 
   private reloadConfig = effect(() => {
     if (this.formService.reloadConfigSignals()) {
-      this.recalculateConfig();
+      untracked(() => {
+        this.recalculateConfig();
+      })
     }
   })
 
