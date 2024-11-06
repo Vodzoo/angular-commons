@@ -204,15 +204,15 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }): FormControlsConfig<T, UserConfig, UserTypes> {
-    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.getFormFieldsConfig();
-    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = {};
+  public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }, key?: string): FormControlsConfig<T, UserConfig, UserTypes> {
+    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = key ? (this.getFormFieldsConfig() as any)[key] : this.getFormFieldsConfig();
+    const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = defaultConfig;
 
-    Object.keys(defaultConfig).forEach(key => {
+    Object.keys(newConfig).forEach(key => {
       const defaultValue: FormFieldConfigFn<T, UserConfig, UserTypes> | object | undefined = (defaultConfig as any)[key];
       const newValue: FormFieldConfigFn<T, UserConfig, UserTypes> | object | undefined = (newConfig as any)[key];
-      if (!newValue) {
-        (mergedConfig as any)[key] = defaultValue;
+      if (!defaultValue) {
+        (mergedConfig as any)[key] = newValue;
       } else if (typeof defaultValue === 'function' && typeof newValue === 'function') {
         const mergedFn: FormFieldConfigFn<T, UserConfig, UserTypes> = (control: FormGroup<T>, config: any, index?: number): any => {
           const defaultFieldConfig = defaultValue(control, config, index) ?? {};
@@ -221,7 +221,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
         };
         (mergedConfig as any)[key] = mergedFn;
       } else {
-        (mergedConfig as any)[key] = newValue;
+        (mergedConfig as any)[key] = this.mergeConfigWith(newValue as object, opts, key);
       }
     })
     return mergedConfig;
@@ -245,7 +245,6 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
   protected formFieldsConfig(): FormControlsConfig<T, UserConfig, UserTypes> {
-    console.warn('NYI, returning empty config!')
     return {};
   }
 
