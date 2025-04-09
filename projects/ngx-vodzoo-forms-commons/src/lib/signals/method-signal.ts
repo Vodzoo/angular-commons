@@ -4,7 +4,7 @@ import {toObservable, toSignal} from "@angular/core/rxjs-interop";
 
 export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R, P>): Signal<R | undefined> {
   let previousMethodValue: P | undefined;
-  let previousMethodParams: NonNullable<T> | undefined;
+  let previousMethodParams: T | undefined;
   return toSignal(
     toObservable(args.params)
       .pipe(
@@ -27,6 +27,6 @@ export function isNonNullable<T>(obj: T): obj is NonNullable<T> {
 }
 
 export interface MethodSignalArgs<T, R, P extends R = R> {
-  params: Signal<NonNullable<T> | undefined>;
+  params: Signal<T>;
   computation: (args: { methodParams: NonNullable<T>, previousMethodParams?: T, previousMethodValue?: P }) => Observable<R> | R;
 }

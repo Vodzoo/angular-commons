@@ -51,11 +51,11 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    * @private
    */
-  private formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
-  private formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
-  private destroyRef: DestroyRef = inject(DestroyRef);
-  private formConfigurationConfig: FormConfigurationConfig = inject(FORM_CONFIGURATION_CONFIG);
-  private mergeConfig: MergeConfig = inject(MERGE_CONFIG);
+  private readonly formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
+  private readonly formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
+  private readonly destroyRef: DestroyRef = inject(DestroyRef);
+  private readonly formConfigurationConfig: FormConfigurationConfig = inject(FORM_CONFIGURATION_CONFIG);
+  private readonly mergeConfig: MergeConfig = inject(MERGE_CONFIG);
 
   constructor() {
     this.formService.recalculateMethods.push(this.recalculateConfig);
@@ -70,13 +70,13 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Fields
    * ------------------------------------
    */
-  private _defaultFormFieldsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.formService.getFormFieldsConfig();
+  private readonly _defaultFormFieldsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.formService.getFormFieldsConfig();
   private _defaultFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
-  private _defaultFormFieldLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.formService.getFormFieldsLogic();
+  private readonly _defaultFormFieldLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.formService.getFormFieldsLogic();
   private _formControlsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this._defaultFormFieldsConfig;
-  private _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
-  private _formFieldLogic: BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>>(this._defaultFormFieldLogic);
-  private _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
+  private readonly _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
+  private readonly _formFieldLogic: BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>>(this._defaultFormFieldLogic);
+  private readonly _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
   private _initialRecalculate: boolean = false;
   public readonly controlsConfig: Observable<FormControlsConfig<T, UserConfig, UserTypes>> = this._controlsConfig$.asObservable();
   public readonly controlsConfigChange: Observable<FormControlsConfigChange<T, UserConfig, UserTypes>> = this._formControlsConfigChange$.asObservable();
@@ -92,7 +92,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Effects
    */
 
-  private reloadConfig = effect(() => {
+  private readonly reloadConfig = effect(() => {
     if (this.formService.reloadConfigSignals()) {
       untracked(() => {
         this.recalculateConfig();

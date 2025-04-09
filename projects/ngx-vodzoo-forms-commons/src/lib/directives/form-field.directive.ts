@@ -45,8 +45,8 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    * ------------------------------------
    * @private
    */
-  private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
-  private config: FormFieldConfig<T> = inject(FORM_FIELD_CONFIG);
+  private readonly cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
+  private readonly config: FormFieldConfig<T> = inject(FORM_FIELD_CONFIG);
 
 
 
@@ -56,7 +56,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    * Fields
    * ------------------------------------
    */
-  private _formControl: FormControl<T> = new FormControl();
+  private readonly _formControl: FormControl<T> = new FormControl();
   private _fieldRequired: boolean = false;
   private _formControlName: string = '';
   private _value: T | null = null;
@@ -64,11 +64,11 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   private _skip: boolean = false;
   private _changeRegistered: boolean = false;
   private _baseFormControl?: AbstractControl<T>;
-  private _baseFormControlReady$: BehaviorSubject<AbstractControl<T> | null> = new BehaviorSubject<AbstractControl<T> | null>(null);
-  private _disabledStateChange$: Subject<boolean> = new Subject();
-  private _valueChange$: Subject<T> = new Subject();
-  private _validate$: Subject<FormFieldValidation<T>> = new Subject();
-  private _destroy$: Subject<void> = new Subject();
+  private readonly _baseFormControlReady$: BehaviorSubject<AbstractControl<T> | null> = new BehaviorSubject<AbstractControl<T> | null>(null);
+  private readonly _disabledStateChange$: Subject<boolean> = new Subject();
+  private readonly _valueChange$: Subject<T> = new Subject();
+  private readonly _validate$: Subject<FormFieldValidation<T>> = new Subject();
+  private readonly _destroy$: Subject<void> = new Subject();
 
   public readonly baseFormControlReady: Observable<AbstractControl<T>> = this._baseFormControlReady$.asObservable()
     .pipe(filter(Boolean), take(1));
@@ -103,7 +103,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    * ------------------------------------
    * @private
    */
-  @HostBinding('class.form-field') private formField: boolean = true;
+  @HostBinding('class.form-field') private readonly formField: boolean = true;
   @HostBinding('class') public get formControlName(): string {
     return this._formControlName;
   };
@@ -166,7 +166,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
           if (this._skip) {
             return;
           }
-          if (isChangedByUiUnset(this.formControl)) {
+          if (isChangedByUiUnset(this.formControl) || isDataChangedByUi(this.formControl)) {
             markAsUiChange(this._baseFormControl);
           }
           resetUiChange(this.formControl);
