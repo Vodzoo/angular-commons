@@ -7,6 +7,7 @@ import {
   Input,
   OnDestroy,
   OnInit,
+  output,
   untracked
 } from '@angular/core';
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
@@ -126,6 +127,10 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { ...this.mergeConfig, immutable: true }));
   }
 
+  /**
+   * Outputs
+   */
+  public configValue = output<FormControlsConfigChange<T, UserConfig, UserTypes>>();
 
 
 
@@ -192,6 +197,10 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
         this.setConfigChange(merged);
       }),
       takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+
+    this.controlsConfigChange.pipe(
+      tap(value => this.configValue.emit(value)),
     ).subscribe();
   }
 
