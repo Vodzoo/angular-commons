@@ -22,7 +22,7 @@ import {
   ValidatorFn
 } from "@angular/forms";
 import {FormService, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
-import {debounceTime, filter, map, Observable, pairwise, startWith, tap} from "rxjs";
+import { BehaviorSubject, debounceTime, filter, map, Observable, pairwise, startWith, take, tap } from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {
   getLabel,
@@ -66,12 +66,12 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * ------------------------------------
    * @private
    */
-  private cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
-  private formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
-  private formEventService: FormEventService = inject(FormEventService);
-  private elementRef: ElementRef = inject(ElementRef);
-  private destroyRef: DestroyRef = inject(DestroyRef);
-  private formConfig: FormConfig = inject(FORM_CONFIG);
+  private readonly cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
+  private readonly formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
+  private readonly formEventService: FormEventService = inject(FormEventService);
+  private readonly elementRef: ElementRef = inject(ElementRef);
+  private readonly destroyRef: DestroyRef = inject(DestroyRef);
+  private readonly formConfig: FormConfig = inject(FORM_CONFIG);
 
 
 
@@ -84,9 +84,11 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private _initialData?: FormValue<T, UserTypes>;
   private _formIndex?: number;
   private _form: FormGroup<T> = this.formService.getFormGroup();
-  private elementLocalName: string = this.elementRef.nativeElement.localName;
+  private readonly elementLocalName: string = this.elementRef.nativeElement.localName;
   private rootForm: boolean = true;
-  private initialClasses: string[] = ['form', this.elementLocalName];
+  private readonly initialClasses: string[] = ['form', this.elementLocalName];
+  private readonly _formReady$: BehaviorSubject<FormGroup<T> | null> = new BehaviorSubject<FormGroup<T> | null>(null);
+  public readonly formReady: Observable<FormGroup<T>> = this._formReady$.asObservable().pipe(filter(Boolean), take(1));
 
 
 
@@ -197,6 +199,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     this.handleInvalidFieldsChanges().subscribe();
     this.handleValueChanges().subscribe();
     this.handlePatchFormValueChanges().subscribe();
+    this._formReady$.next(this.form)
 
     if (this.rootForm) {
       this.sendFormCreated();
