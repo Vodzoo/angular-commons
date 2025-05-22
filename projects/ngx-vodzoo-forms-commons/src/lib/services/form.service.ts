@@ -41,9 +41,9 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
   protected fb: FormBuilder = inject(FormBuilder);
-  private storage: Storage = inject(STORAGE);
-  private formServiceConfig: FormServiceConfig = inject(FORM_SERVICE_CONFIG);
-  private mergeConfig: MergeConfig = inject(MERGE_CONFIG);
+  private readonly storage: Storage = inject(STORAGE);
+  private readonly formServiceConfig: FormServiceConfig = inject(FORM_SERVICE_CONFIG);
+  private readonly mergeConfig: MergeConfig = inject(MERGE_CONFIG);
 
 
 
@@ -68,9 +68,9 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   };
   protected saveInStorage: boolean = true;
   protected removeFromStorageOnDestroy: boolean = true;
-  private formValues: Map<string, FormValues<T, UserTypes>> = new Map();
-  private patchFormValue: Subject<{componentId: string, value: FormValue<T, UserTypes>}> = new Subject();
-  private formValuesChanges$: BehaviorSubject<Map<string, FormValues<T, UserTypes>>> = new BehaviorSubject(this.formValues);
+  private readonly formValues: Map<string, FormValues<T, UserTypes>> = new Map();
+  private readonly patchFormValue: Subject<{componentId: string, value: FormValue<T, UserTypes>}> = new Subject();
+  private readonly formValuesChanges$: BehaviorSubject<Map<string, FormValues<T, UserTypes>>> = new BehaviorSubject(this.formValues);
 
 
   /**
@@ -110,6 +110,15 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
    * ------------------------------------
    */
 
+  public clearData(opts?: ClearDataOptions): void {
+    if (!opts?.skipStorage) {
+      [...this.formValues.keys()].forEach(key => this.storage.removeItem(key));
+    }
+    if (!opts?.skipService) {
+      this.formValues.clear();
+      this.formValuesChanges$.next(this.formValues);
+    }
+  }
 
   public getFormValues(componentId: string = this.defaultComponentId): FormValues<T, UserTypes> | undefined {
     const valuesFromMap: FormValues<T, UserTypes> | undefined = this.formValues.get(componentId);
@@ -335,7 +344,11 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
 /**
- * Types
+ * Types / Interfaces
  */
 export type ValidatorFunctions = ValidatorFn[];
 export type Nullable<T> = T | null | undefined;
+export interface ClearDataOptions {
+  skipStorage?: boolean;
+  skipService?: boolean;
+}
