@@ -18,7 +18,6 @@ export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R,
           previousMethodParams = args.params();
         })
       ),
-    { rejectErrors: true }
   );
 }
 
