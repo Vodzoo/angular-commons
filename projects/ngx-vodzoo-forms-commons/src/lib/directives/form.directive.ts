@@ -2,12 +2,16 @@ import {
   ChangeDetectorRef,
   DestroyRef,
   Directive,
+  effect,
+  EffectRef,
   ElementRef,
   EventEmitter,
   HostBinding,
   inject,
   InjectionToken,
+  input,
   Input,
+  InputSignal,
   OnInit,
   Output,
   Provider,
@@ -22,7 +26,19 @@ import {
   ValidatorFn
 } from "@angular/forms";
 import {FormService, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
-import { BehaviorSubject, debounceTime, filter, map, Observable, pairwise, startWith, take, tap } from "rxjs";
+import {
+  BehaviorSubject,
+  debounceTime,
+  filter,
+  map,
+  merge,
+  Observable,
+  pairwise,
+  startWith,
+  Subscription,
+  take,
+  tap
+} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {
   getLabel,
@@ -34,6 +50,7 @@ import {
 } from "./form-field.directive";
 import {FormEventService} from "../services/form-event.service";
 import {FormEvent} from "./form-events.directive";
+import { markAllAsTouched } from "../markAllAsTouched";
 
 
 export const DEFAULT_FORM_CONFIG: FormConfig = {
@@ -127,7 +144,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     }
   }
 
-
+  public showErrors: InputSignal<ShowErrors<T> | undefined> = input(); // mark all form controls as touched
 
 
   /**
@@ -182,6 +199,31 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   };
 
 
+  /**
+   * Effects
+   */
+  public handleShowErrors: EffectRef = effect((onCleanup) => {
+    const showErrors = this.showErrors();
+    if (!showErrors) {
+      return;
+    }
+    const conditionFn: ShowErrorsConditionFn<T> | undefined = showErrors.withCondition;
+    const value: boolean | undefined = showErrors.withValue;
+    if (conditionFn) {
+      const markAsTouched: Subscription = merge(this.form.valueChanges, this.form.statusChanges.pipe(startWith(this.form.status)))
+        .pipe(
+          debounceTime(0),
+          filter(() => conditionFn({form: this.form})),
+          tap(() => markAllAsTouched(this.form)),
+        ).subscribe();
+      onCleanup(() => {
+        markAsTouched.unsubscribe();
+      });
+    }
+    if (value === true) {
+      markAllAsTouched(this.form);
+    }
+  });
 
 
   /**
@@ -474,6 +516,7 @@ type RecursivePartialValidators<T, UserTypes> = {
 type ArrayValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueValidatorFn : RecursivePartialValidators<T, UserTypes>;
 type ValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueValidatorFn : RecursivePartialValidators<T, UserTypes>;
 export type ValueValidatorFn = (index?: number | null) => ValidatorFunctions;
+export type ShowErrorsConditionFn<T extends { [K in keyof T]: AbstractControl }> = (data: ShowErrorsConditionFnData<T>) => boolean;
 
 
 /**
@@ -493,6 +536,14 @@ export interface ValueChanges<T, UserTypes> {
 export interface StatusChanges {
   previous: FormControlStatus;
   current: FormControlStatus;
+}
+
+export interface ShowErrors<T extends { [K in keyof T]: AbstractControl }> {
+  withCondition?: ShowErrorsConditionFn<T>; // shows errors when this function returns true - fn is fired on form value and status change
+  withValue?: boolean; // shows errors when this value = true
+}
+export interface ShowErrorsConditionFnData<T extends { [K in keyof T]: AbstractControl }> {
+  form: FormGroup<T>;
 }
 
 

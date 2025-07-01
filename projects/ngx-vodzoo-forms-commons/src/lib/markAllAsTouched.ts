@@ -5,7 +5,7 @@ export function markAllAsTouched(abstractControl: AbstractControl): void {
     Object.values(abstractControl.controls).forEach((control: AbstractControl) => {
       markAllAsTouched(control);
     })
-  } else if (abstractControl instanceof FormControl) {
+  } else if (abstractControl instanceof FormControl && abstractControl.untouched) {
     abstractControl.markAsTouched({onlySelf: true});
     abstractControl.updateValueAndValidity({onlySelf: true});
   }
