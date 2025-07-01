@@ -101,6 +101,14 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     }
   })
 
+  private readonly reloadLogic = effect(() => {
+    if (this.formService.reloadLogicSignals()) {
+      untracked(() => {
+        this.formControlsLogic = this._formFieldLogic.value;
+      })
+    }
+  })
+
 
 
   /**
@@ -125,6 +133,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   @Input()
   public set formControlsLogic(value: FormControlsLogic<T, UserConfig, UserTypes> | undefined) {
     this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { ...this.mergeConfig, immutable: true }));
+    if (this._initialRecalculate) {
+      this.runLogic(this._formFieldLogic.value, 'recalculate', 'none', this._formControlsConfigChange$.value);
+    }
   }
 
   /**
@@ -229,7 +240,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     return change;
   }
 
-  private runLogic(logic: FormControlsLogic<T, UserConfig, UserTypes>, phase: 'init' | 'config' | 'value', subphase: 'beforeConfig' | 'afterConfig', config?: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
+  private runLogic(logic: FormControlsLogic<T, UserConfig, UserTypes>, phase: LogicPhase, subphase: LogicSubphase, config?: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
     Object.keys(logic).forEach((key: string) => {
       const fieldLogic: FormFieldLogic<T, UserConfig, UserTypes> = (logic as any)[key];
       switch (phase) {
@@ -242,6 +253,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
         case 'value':
           this.valueChange(fieldLogic, subphase, config);
           break;
+        case 'recalculate':
+          this.recalculateLogic(fieldLogic, config);
+          break;
         default:
           break;
       }
@@ -250,7 +264,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
 
   private initLogic(
     fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
-    subphase: 'beforeConfig' | 'afterConfig',
+    subphase: LogicSubphase,
     config?: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
     if (subphase === 'beforeConfig') {
       fieldLogic.onInit?.beforeConfig?.(this.formDirective.form, this.formDirective.formIndex);
@@ -264,7 +278,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
 
   private configChange(
     fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
-    subphase: 'beforeConfig' | 'afterConfig',
+    subphase: LogicSubphase,
     config?: FormControlsConfigChange<T, UserConfig, UserTypes>
   ): void {
     if (subphase === 'beforeConfig') {
@@ -279,7 +293,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
 
   private valueChange(
     fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
-    subphase: 'beforeConfig' | 'afterConfig',
+    subphase: LogicSubphase,
     config?: FormControlsConfigChange<T, UserConfig, UserTypes>
   ): void {
     if (subphase === 'beforeConfig') {
@@ -290,6 +304,16 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
       }
       fieldLogic.onValueChange?.afterConfig?.(this.formDirective.form, config, this.formDirective.formIndex);
     }
+  }
+
+  private recalculateLogic(
+    fieldLogic: FormFieldLogic<T, UserConfig, UserTypes>,
+    config?: FormControlsConfigChange<T, UserConfig, UserTypes>,
+  ): void {
+    if (!config) {
+      throw new Error('No config!');
+    }
+    fieldLogic.onLogicRecalculate?.({form: this.formDirective.form, index: this.formDirective.formIndex, config, logic: fieldLogic});
   }
 
   private setConfigChange(value: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
@@ -358,6 +382,10 @@ export interface FormFieldLogic<T extends { [K in keyof T]: AbstractControl }, U
     beforeConfig?: FormFieldLogicBeforeFn<T>;
     afterConfig?: FormFieldLogicAfterFn<T, UserConfig, UserTypes>;
   }
+  onLogicRecalculate?: FormFieldLogicRecalculateFn<T, UserConfig, UserTypes>;
 }
 export type FormFieldLogicBeforeFn<T extends { [K in keyof T]: AbstractControl }> = (form: FormGroup<T>, index?: number) => void;
+export type FormFieldLogicRecalculateFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (data: {form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>, logic: Omit<FormFieldLogic<T, UserConfig, UserTypes>, 'onLogicRecalculate'>, index?: number}) => void;
 export type FormFieldLogicAfterFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>, index?: number) => void;
+export type LogicPhase = 'init' | 'config' | 'value' | 'recalculate';
+export type LogicSubphase = 'beforeConfig' | 'afterConfig' | 'none';

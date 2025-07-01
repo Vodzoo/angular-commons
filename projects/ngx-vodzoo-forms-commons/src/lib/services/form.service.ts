@@ -85,6 +85,9 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   public reloadConfigSignals: Signal<any> = computed((): any => {
     return false;
   });
+  public reloadLogicSignals: Signal<any> = computed((): any => {
+    return false;
+  });
 
 
   /**
