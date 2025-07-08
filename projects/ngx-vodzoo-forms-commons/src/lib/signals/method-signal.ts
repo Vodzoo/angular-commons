@@ -1,5 +1,5 @@
 import {Signal} from "@angular/core";
-import {filter, isObservable, Observable, of, switchMap, tap} from "rxjs";
+import { catchError, EMPTY, filter, isObservable, Observable, of, switchMap, tap } from "rxjs";
 import {toObservable, toSignal} from "@angular/core/rxjs-interop";
 
 export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R, P>): Signal<R | undefined> {
@@ -11,7 +11,13 @@ export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R,
         filter(isNonNullable),
         switchMap(methodParams => {
           const comp: Observable<R> | R = args.computation({methodParams, previousMethodParams, previousMethodValue});
-          return isObservable(comp) ? comp : of(comp);
+          return isObservable(comp) ? comp.pipe(
+            catchError((error) => {
+              console.error(error);
+              args.onError?.(error);
+              return EMPTY;
+            }),
+          ) : of(comp);
         }),
         tap(value => {
           previousMethodValue = value as P;
@@ -28,4 +34,5 @@ export function isNonNullable<T>(obj: T): obj is NonNullable<T> {
 export interface MethodSignalArgs<T, R, P extends R = R> {
   params: Signal<T>;
   computation: (args: { methodParams: NonNullable<T>, previousMethodParams?: T, previousMethodValue?: P }) => Observable<R> | R;
+  onError?: (error: any) => void;
 }
