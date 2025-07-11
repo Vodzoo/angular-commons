@@ -3,6 +3,7 @@
  */
 
 export * from './lib/addValidatorWithContext';
+export * from './lib/addAsyncValidatorWithContext';
 export * from './lib/directives/form.directive';
 export * from './lib/directives/form-config.directive';
 export * from './lib/directives/form-events.directive';
