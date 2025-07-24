@@ -17,7 +17,8 @@ export const STORAGE: InjectionToken<Storage> = new InjectionToken<Storage>('sto
 });
 
 export const DEFAULT_FORM_SERVICE_CONFIG: FormServiceConfig = {
-  storageSaveOn: ['userChange']
+  storageSaveOn: ['userChange'],
+  parserFn: JSON.parse,
 } as const;
 
 export const FORM_SERVICE_CONFIG: InjectionToken<FormServiceConfig> = new InjectionToken<FormServiceConfig>('FORM_SERVICE_CONFIG', {
@@ -26,6 +27,7 @@ export const FORM_SERVICE_CONFIG: InjectionToken<FormServiceConfig> = new Inject
 
 export interface FormServiceConfig {
   storageSaveOn: ReadonlyArray<StorageSaveOn>;
+  parserFn: (text: string) => any;
 }
 
 export type StorageSaveOn = 'userChange' | 'nonUserChange' | 'dataChange' | 'rawDataChange';
@@ -79,8 +81,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
     // return different object/value (must resolve to true) every time config needs to be recalculated eg.
     // public reloadConfigSignals: Signal<any> = computed((): any => {
-    //     this.mySignal();
-    //     return Date.now();
+    //     return [this.mySignal()];
     //   });
   public reloadConfigSignals: Signal<any> = computed((): any => {
     return false;
@@ -130,7 +131,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     }
 
     const storageString: string | null = this.storage.getItem(componentId);
-    const valuesFromStorage: FormValues<T, UserTypes> | undefined = storageString ? JSON.parse(storageString) : undefined;
+    const valuesFromStorage: FormValues<T, UserTypes> | undefined = storageString ? this.formServiceConfig.parserFn(storageString) : undefined;
     if (valuesFromStorage) {
       this.setFormValues(valuesFromStorage, componentId, false);
     }
