@@ -1,10 +1,12 @@
 import {
   ChangeDetectorRef,
+  computed,
   Directive,
   forwardRef,
   HostBinding,
   inject,
   InjectionToken,
+  input,
   Input,
   OnDestroy
 } from '@angular/core';
@@ -93,6 +95,16 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
     return this._label;
   };
   @Input({transform: (value: unknown) => typeof value !== 'function' ? () => null : value}) public vFormField?: (control: AbstractControl<T>) => ValidationErrors | null;
+
+  public enableTouchOnInitialError$ = input<EnableTouchOnInitialErrorFn<T> | undefined>(undefined, {alias: 'enableTouchOnInitialError'});
+
+
+
+
+  /**
+   * Computed
+   */
+  private readonly enableTouchOnInitialError = computed((): EnableTouchOnInitialErrorFn<T> => this.enableTouchOnInitialError$() ?? this.config.enableTouchOnInitialError);
 
 
 
@@ -271,7 +283,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
               }
               this.formControl.setErrors(allErrors, {emitEvent: false});
               const errors: ValidationErrors | null = this.formControl.errors;
-              if (this.formControl.pristine && this.formControl.untouched && errors && this.config.enableTouchOnInitialError(this.formControl, this.formControlName)) {
+              if (this.formControl.pristine && this.formControl.untouched && errors && this.enableTouchOnInitialError()(this.formControl, this.formControlName)) {
                 this.formControl.markAsTouched({onlySelf: true});
               }
               this.cdr.markForCheck();
@@ -433,9 +445,11 @@ export interface FormField<T> {
 }
 
 export interface FormFieldConfig<T> {
-  enableTouchOnInitialError: (control: FormControl<T>, controlName: string) => boolean;
+  enableTouchOnInitialError: EnableTouchOnInitialErrorFn<T>;
   requiredValidators?: ValidatorFn[];
 }
+
+export type EnableTouchOnInitialErrorFn<T> = (control: FormControl<T>, controlName: string) => boolean;
 
 export interface FormFieldValidation<T> {
   control: FormControl<T>;
