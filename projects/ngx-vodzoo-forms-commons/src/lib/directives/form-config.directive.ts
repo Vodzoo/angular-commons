@@ -71,6 +71,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Fields
    * ------------------------------------
    */
+  private _initFired: boolean = false;
+  private _configBeforeInit: boolean = true;
+  private _logicBeforeInit: boolean = true;
   private readonly _defaultFormFieldsConfig: FormControlsConfig<T, UserConfig, UserTypes> = this.formService.getFormFieldsConfig();
   private _defaultFormFieldsConfigChange: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
   private readonly _defaultFormFieldLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.formService.getFormFieldsLogic();
@@ -78,7 +81,6 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   private readonly _formControlsConfigChange$: BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfigChange<T, UserConfig, UserTypes>>(this.mapConfigToChange(this._formControlsConfig));
   private readonly _formFieldLogic: BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsLogic<T, UserConfig, UserTypes>>(this._defaultFormFieldLogic);
   private readonly _controlsConfig$: BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>> = new BehaviorSubject<FormControlsConfig<T, UserConfig, UserTypes>>(this._formControlsConfig);
-  private _initialRecalculate: boolean = false;
   public readonly controlsConfig: Observable<FormControlsConfig<T, UserConfig, UserTypes>> = this._controlsConfig$.asObservable();
   public readonly controlsConfigChange: Observable<FormControlsConfigChange<T, UserConfig, UserTypes>> = this._formControlsConfigChange$.asObservable();
   public readonly controlsLogic: Observable<FormControlsLogic<T, UserConfig, UserTypes>> = this._formFieldLogic.asObservable();
@@ -120,21 +122,33 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   public set formControlsConfig(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined) {
     this._formControlsConfig = !value || Object.keys(value).length === 0 ? this._defaultFormFieldsConfig : value;
     this.setConfig(this._formControlsConfig);
-    this.runLogic(this._formFieldLogic.value, this._initialRecalculate ? 'config' : 'init', 'beforeConfig');
+    if (this._initFired) {
+      this.runLogic(this._formFieldLogic.value, 'config' , 'beforeConfig');
+    }
     this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
     const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
     const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(value);
     const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
-    this.runLogic(this._formFieldLogic.value, this._initialRecalculate ? 'config' : 'init', 'afterConfig', merged);
+
+    if (this._initFired) {
+      this.runLogic(this._formFieldLogic.value, 'config' , 'afterConfig', merged);
+    }
     this.setConfigChange(merged);
-    this._initialRecalculate = true;
+
+    if (this._initFired) {
+      this._configBeforeInit = false;
+    }
   }
 
   @Input()
   public set formControlsLogic(value: FormControlsLogic<T, UserConfig, UserTypes> | undefined) {
     this.setLogic(!value || Object.keys(value).length === 0 ? this._defaultFormFieldLogic : mergeDeep(this._defaultFormFieldLogic, value, { ...this.mergeConfig, immutable: true }));
-    if (this._initialRecalculate) {
+    if (this._initFired) {
       this.runLogic(this._formFieldLogic.value, 'recalculate', 'none', this._formControlsConfigChange$.value);
+    }
+
+    if (this._initFired) {
+      this._logicBeforeInit = false;
     }
   }
 
@@ -167,17 +181,22 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    */
   public ngOnInit(): void {
-    if (!this._initialRecalculate) {
-      this._initialRecalculate = true;
-      this.setConfig(this._formControlsConfig);
-      this.runLogic(this._formFieldLogic.value, 'init', 'beforeConfig');
-      this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
-      const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
-      const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
-      const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
-      this.runLogic(this._formFieldLogic.value, 'init', 'afterConfig', merged);
-      this.setConfigChange(merged);
+    this.setConfig(this._formControlsConfig);
+    this.runLogic(this._formFieldLogic.value, 'init', 'beforeConfig');
+    this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
+    const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
+    const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
+    const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
+    this.runLogic(this._formFieldLogic.value, 'init', 'afterConfig', merged);
+    if (this._configBeforeInit) {
+      this.runLogic(this._formFieldLogic.value, 'config', 'beforeConfig');
+      this.runLogic(this._formFieldLogic.value, 'config', 'afterConfig', merged);
     }
+    if (this._logicBeforeInit) {
+      this.runLogic(this._formFieldLogic.value, 'recalculate', 'none', merged);
+    }
+    this.setConfigChange(merged);
+
     if (!this.formConfigurationConfig.alwaysTrackConfigChange && Object.keys(this.controlsConfigChangeValue).length === 0) {
       return;
     }
@@ -213,6 +232,10 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     this.controlsConfigChange.pipe(
       tap(value => this.configValue.emit(value)),
     ).subscribe();
+
+    this._initFired = true;
+    this._configBeforeInit = false;
+    this._logicBeforeInit = false;
   }
 
   public ngOnDestroy(): void {
