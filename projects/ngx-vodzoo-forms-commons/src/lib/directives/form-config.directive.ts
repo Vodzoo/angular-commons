@@ -201,13 +201,15 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
       return;
     }
 
-    let status: FormControlStatus = this.formDirective.form.root.status;
+    let status: FormControlStatus = this.formDirective.form.status;
     this.formDirective.form.root.valueChanges.pipe(
       debounceTime(0),
       distinctUntilChanged((prev, cur) => {
-        const curStatus: FormControlStatus = this.formDirective.form.root.status;
+        const curStatus: FormControlStatus = this.formDirective.form.status;
+        const curStatusRoot: FormControlStatus = this.formDirective.form.root.status;
         const statusChanged: boolean = curStatus !== status;
-        if (statusChanged) {
+        const statusChangedRoot: boolean = curStatusRoot !== curStatus;
+        if (statusChanged || statusChangedRoot) {
           status = curStatus;
           return false;
         }
