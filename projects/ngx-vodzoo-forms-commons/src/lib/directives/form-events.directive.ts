@@ -16,7 +16,8 @@ export interface FormEvent<T, R extends string, V> {
   standalone: true
 })
 export class FormEventsDirective {
-  private formEventService: FormEventService = inject(FormEventService);
+  private readonly formEventService: FormEventService = inject(FormEventService);
+
   public emitEvent<T, R extends string, V>(value: Omit<FormEvent<T, R, V>, 'controlName'>): void {
     this.formEventService.events.next({...value, controlName: value.control ? getControlName(value.control) : ''});
   }
