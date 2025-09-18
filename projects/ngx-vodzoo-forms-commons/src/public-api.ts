@@ -14,3 +14,4 @@ export * from './lib/markAllAsTouched';
 export { DEFAULT_MERGE_CONFIG, MERGE_CONFIG, MergeConfig } from './lib/mergeDeep';
 export * from './lib/services/form.service';
 export * from './lib/signals/method-signal';
+export * from './lib/validateObject';
