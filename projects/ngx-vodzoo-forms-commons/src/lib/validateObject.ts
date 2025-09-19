@@ -1,140 +1,97 @@
 /**
- * `Example:`
- *
- * Interfaces:
+ * validateObject function config
+ */
+export const VALIDATE_OBJECT_CONFIG: ValidateObjectConfig = {};
+
+/**
  * ```ts
- * interface A {
- *   name?: string;
- *   objectB?: B;
- * }
- * type ValidatedA = A & {objectB: ValidatedB };
- * ```
- * ```ts
- * interface B {
- *   surname?: string;
- * }
- * type ValidatedB = B & {surname: string};
- * ```
+ * VALIDATE_OBJECT_CONFIG.skipThrow = true; // by default, the function will throw Error() when there are errors returned by ValidateFn
  *
- * Objects:
- * ```ts
- * const objectB: B = {
- *   surname: undefined,
- * };
- *
- * const objectA: A = {
- *   name: undefined,
- *   objectB: objectB,
- * };
- * ```
- * ValidationFns:
- * ```ts
- * function validateA1(a?: A | null): ValidationStatus {
- *   const errors: string[] = [];
- *   if (!a) {
- *     return { errors: ['No object A!'] };
- *   }
- *   if (!a.name) {
- *     errors.push('Name is required!');
- *   }
- *
- *   errors.push(...validateB1(a.objectB).errors);
- *
- *   return {
- *     errors,
- *   };
- * }
- * ```
- * ```ts
- * function validateA2(a?: A | null): ValidationStatus {
- *   const errors: string[] = [];
- *   if (!a) {
- *     return { errors: ['No object A!'] };
- *   }
- *   if (a.name !== 'Mark') {
- *     errors.push('Name is not Mark');
- *   }
- *
- *   errors.push(...validateB2(a.objectB).errors);
- *
- *   return {
- *     errors,
- *   };
- * }
- * ```
- * ```ts
- * function validateB1(b?: B | null): ValidationStatus {
- *   const errors: string[] = [];
- *   if (!b) {
- *     return { errors: ['No object B!'] };
- *   }
- *
- *   if (!b.surname) {
- *     errors.push('Surname is required!');
- *   }
- *
- *   return { errors };
- * }
- * ```
- * ```ts
- * function validateB2(b?: B | null): ValidationStatus {
- *   const errors: string[] = [];
- *   if (!b) {
- *     return { errors: ['No object B!'] };
- *   }
- *
- *   if (b.surname !== 'Norton') {
- *     errors.push('Surname is not Norton!');
- *   }
- *
- *   return { errors };
- * }
- * ```
- * Run validation:
- * ```ts
- * const validatedA: ValidatedA = validateObject<A, ValidatedA>({
- *   object: objectA,
- *   validateFn: (withValidatorFn) => {
- *     withValidatorFn(validateA1);
- *     withValidatorFn(validateA2);
+ * const validatedData = validateObject<Data, ValidatedData>({
+ *   object: data,
+ *   validateFn: validateData,
+ *   onErrorFn: errors => {
+ *     // custom error logic, eg. send errors to alert service
+ *     return { skipThrow: false }; // return false to throw Error() - overrides VALIDATE_OBJECT_CONFIG
  *   },
- *   onErrorFn: statuses => console.log(statuses.get(validateA2)),
+ *   initialErrors: validateObject({
+ *     object: data2,
+ *     validateFn: validateData2,
+ *     onErrorFn: () => ({ skipThrow: true }), // skip throw to get errors from returned object
+ *   }).errors, // these errors will be merged with errors from validateData
  * });
  *
- * console.log(validatedA.objectB.surname.toLowerCase());
+ * console.log(validatedPodmiot.object); // object with ValidatedData type
+ * console.log(validatedPodmiot.errors); // non-empty array when skipThrow = false and there are errors returned by ValidateFn
+ * ```
+ * ```ts
+ * const validateData: ValidateFn<Data> = (object) => {
+ *   return {
+ *     errors: [
+ *       ...validate1(object).errors,
+ *       ...validate2(object).errors,
+ *     ],
+ *   };
+ * };
+ * ```
+ * ```ts
+ * function validate1(value?: Data | null): ValidationStatus {
+ *   const errors: string[] = [];
+ *   if (!value) {
+ *     return { errors: ['No data!'] };
+ *   }
+ *   errors.push(...validateSubData(value.subdata1).errors);
+ *
+ *   return { errors };
+ * }
+ *
+ *
+ * function validate2(value?: Data | null): ValidationStatus {
+ *   const errors: string[] = [];
+ *   if (!value) {
+ *     return { errors: ['No data!'] };
+ *   }
+ *   errors.push(...validateSubData2(value.subdata2).errors);
+ *
+ *   return { errors };
+ * }
  * ```
  * @param spec
  */
-export function validateObject<T, R extends T>(spec: ValidateSpec<T>): R {
+export function validateObject<T, R extends T>(spec: ValidateSpec<T>): ValidateObjectStatus<R> {
   const allErrors: Set<string> = new Set();
-  const statuses: Map<ValidatorFn<T>, ValidationStatus> = new Map();
-  spec.validateFn((validatorFn: ValidatorFn<T>) => {
-    const status: ValidationStatus = validatorFn(spec.object);
-    statuses.set(validatorFn, status);
-    status.errors.forEach(error => allErrors.add(error));
-  });
+  spec.initialErrors?.forEach(error => allErrors.add(error));
+  spec.validateFn(spec.object).errors.forEach(error => allErrors.add(error));
+  const errors: string[] = Array.from(allErrors);
   if (allErrors.size) {
-    spec?.onErrorFn?.(statuses);
-    throw new Error(`\n- ${Array.from(allErrors).join('\n- ')}`);
+    const opts: OnErrorOpts | undefined = spec?.onErrorFn?.(errors);
+    if ((VALIDATE_OBJECT_CONFIG.skipThrow !== true && opts?.skipThrow !== true)
+      || (VALIDATE_OBJECT_CONFIG.skipThrow === true && opts?.skipThrow === false)
+    ) {
+      throw new Error(`\n- ${errors.join('\n- ')}`);
+    }
   }
-  return spec.object as R;
+  return {
+    object: spec.object as R,
+    errors,
+  };
 }
 
-
-/**
- * Interfaces & types
- */
+// Interfaces & types
 
 export interface ValidateSpec<T> {
   object: T;
   validateFn: ValidateFn<T>;
-  onErrorFn?: OnErrorFn<T>;
+  onErrorFn?: OnErrorFn;
+  initialErrors?: string[];
 }
 export interface ValidationStatus {
   errors: string[];
 }
-export type ValidateFn<T> = (withValidatorFn: WithValidatorFn<T>) => void;
-export type WithValidatorFn<T> = (validatorFn: ValidatorFn<T>) => void;
-export type ValidatorFn<T> = (obj: T) => ValidationStatus;
-export type OnErrorFn<T> = (statuses: OnErrorFnStatuses<T>) => void;
-export type OnErrorFnStatuses<T> = Map<ValidatorFn<T>, ValidationStatus>;
+export interface OnErrorOpts {
+  skipThrow?: boolean;
+}
+export type ValidateObjectConfig = OnErrorOpts;
+export type ValidateFn<T> = (object: T) => ValidationStatus;
+export type OnErrorFn = (errors: string[]) => OnErrorOpts | undefined;
+export type ValidateObjectStatus<T> = { object: T } & ValidationStatus;
