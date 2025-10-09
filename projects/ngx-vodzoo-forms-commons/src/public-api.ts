@@ -10,6 +10,7 @@ export * from './lib/directives/form-events.directive';
 export * from './lib/directives/form-field.directive';
 export * from './lib/disableWithContext';
 export { getConfig, getDefaultConfig, getConfigField, Paths } from './lib/formConfig';
+export { getValues, getInitialValue } from './lib/formValues';
 export * from './lib/markAllAsTouched';
 export { DEFAULT_MERGE_CONFIG, MERGE_CONFIG, MergeConfig } from './lib/mergeDeep';
 export * from './lib/services/form.service';
