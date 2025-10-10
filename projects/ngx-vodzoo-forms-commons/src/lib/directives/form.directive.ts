@@ -51,7 +51,7 @@ import {
 import {FormEventService} from "../services/form-event.service";
 import {FormEvent} from "./form-events.directive";
 import { markAllAsTouched } from "../markAllAsTouched";
-import { setInitialValue, setValues } from "../formValues";
+import { setRootFormInitialValue, setRootFormValueChanges } from "../formValues";
 
 
 export const DEFAULT_FORM_CONFIG: FormConfig = {
@@ -337,7 +337,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
             firstUiChange = false;
           }
         }),
-        tap((value: ValueChanges<T, UserTypes>) => setValues(this.form, value)),
+        tap((value: ValueChanges<T, UserTypes>) => setRootFormValueChanges(this.form, value)),
         tap((value: ValueChanges<T, UserTypes>) => this.valueChanged.emit(value)),
         takeUntilDestroyed(this.destroyRef)
       ) as Observable<ValueChanges<T, UserTypes>>;
@@ -435,7 +435,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     if (!this.initialData) {
       this.initialData = this.formService.initialValue ?? this.formService.getFormGroup().getRawValue();
     }
-    setInitialValue(this._form, this.initialData);
+    setRootFormInitialValue(this._form, this.initialData);
   }
 
 
