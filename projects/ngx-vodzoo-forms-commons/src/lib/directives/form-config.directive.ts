@@ -13,7 +13,7 @@ import {
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {FormService} from "../services/form.service";
-import {BehaviorSubject, debounceTime, distinctUntilChanged, Observable, tap} from "rxjs";
+import {BehaviorSubject, debounceTime, distinctUntilChanged, Observable, startWith, tap} from "rxjs";
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {setConfig} from "../formConfig";
 import {MERGE_CONFIG, MergeConfig, mergeDeep} from "../mergeDeep";
@@ -179,6 +179,8 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Outputs
    */
   public configValue = output<FormControlsConfigChange<T, UserConfig, UserTypes>>();
+  public config = output<FormControlsConfig<T, UserConfig, UserTypes>>();
+  public logic = output<FormControlsLogic2<T, UserConfig, UserTypes>>();
 
 
 
@@ -261,7 +263,18 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     ).subscribe();
 
     this.controlsConfigChange.pipe(
+      startWith(this._formControlsConfigChange$.value),
       tap(value => this.configValue.emit(value)),
+    ).subscribe();
+
+    this.controlsConfig.pipe(
+      startWith(this._controlsConfig$.value),
+      tap(value => this.config.emit(value)),
+    ).subscribe();
+
+    this.controlsLogic2.pipe(
+      startWith(this._formFieldLogic2.value),
+      tap(value => this.logic.emit(value)),
     ).subscribe();
 
     this._initFired = true;
