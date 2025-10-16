@@ -1,0 +1,10 @@
+@if (formDirective.form.controls; as controls) {
+<% fields.forEach(field => { %>
+  <<%= componentSelectorPrefix ? componentSelectorPrefix + '-' : '' %><%= field.htmlSelector %>
+    [formControl]="controls.<%= field.name %>"
+    [label]="config()?.<%= field.name %>?.label ?? '<%= field.label ?? '' %>'"
+    [enableTouchOnInitialError]="config()?.<%= field.name %>?.enableTouchOnInitialError"
+    <% commonFieldInputs.forEach(input => { %>[<%= input %>]="config()?.<%= field.name %>?.<%= input %> ?? {}"
+    <% }) %>/>
+<% }) %>
+}

@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "generate-form",
+  "title": "Form Generator",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Form name"
+    },
+    "formSelectorPrefix": {
+      "type": "string",
+      "description": "Form selector prefix"
+    },
+    "componentSelectorPrefix": {
+      "type": "string",
+      "description": "Component selector prefix"
+    },
+    "commonFieldInputs": {
+      "type": "string",
+      "description": "Common inputs",
+      "examples": ["'[ \"config\", \"configFormField\" ]'"]
+    },
+    "formDirectiveClass": {
+      "type": "string",
+      "description": "Class",
+      "examples": ["@Injectable()\nexport class MyFormDirective<T extends { [K in keyof T]: AbstractControl<any, any> }> extends FormDirective<T, MyAppFormFieldConfig<any>, MyFormTypes> {}"]
+    },
+    "formConfigDirectiveClass": {
+      "type": "string",
+      "description": "Class",
+      "examples": ["@Injectable()\nexport class MyFormConfigDirective<T extends { [K in keyof T]: AbstractControl<any, any> }> extends FormConfigDirective<T, MyAppFormFieldConfig<any>, MyFormTypes> {}"]
+    },
+    "formServiceClass": {
+      "type": "string",
+      "description": "Class",
+      "examples": ["@Injectable()\nexport class MyFormService<T extends { [K in keyof T]: AbstractControl<any, any> }> extends FormService<T, MyAppFormFieldConfig<any>, MyFormTypes> {}"]
+    },
+    "formServiceImports": {
+      "type": "string",
+      "description": "Imports",
+      "examples": ["'[ \"import { Injectable } from \\\"@angular/core\\\";\", \"import { FormControl, FormGroup } from \\\"@angular/forms\\\";\" ]'"]
+    },
+    "formComponentImports": {
+      "type": "string",
+      "description": "Imports",
+      "examples": ["'[ \"import { Injectable } from \\\"@angular/core\\\";\", \"import { FormControl, FormGroup } from \\\"@angular/forms\\\";\" ]'"]
+    },
+    "formValueType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormValue<T> = FormValue<T, MyFormTypes>;"]
+    },
+    "formType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyForm<T extends { [K in keyof T]: AbstractControl<any, any> }> = Form<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "formDisabledStateType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormDisabledState<T> = FormDisabledState<T, MyFormTypes>;"]
+    },
+    "formValidatorsType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormValidators<T> = FormValidators<T, MyFormTypes>;"]
+    },
+    "formControlsConfigType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormControlsConfig<T> = FormControlsConfig<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "formControlsConfigChangeType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormControlsConfigChange<T> = FormControlsConfigChange<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "formControlsLogic2Type": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormControlsLogic2<T> = FormControlsLogic2<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "formFieldConfigType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["interface MyAppFormFieldConfig<T, R = any> {label?: string; enableTouchOnInitialError?: EnableTouchOnInitialErrorFn<R>; configFormField?: Partial<MyFormFieldConfig>; config?: Partial<T>;}"]
+    },
+    "formFieldLogic2FnSpecType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormFieldLogic2FnSpec<T extends { [K in keyof T]: AbstractControl<any, any> }> = FormFieldLogic2FnSpec<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "fields": {
+      "type": "string",
+      "description": "Form fields"
+    },
+    "path": {
+      "type": "string",
+      "description": "Path to generate"
+    }
+  },
+  "required": ["name"]
+}

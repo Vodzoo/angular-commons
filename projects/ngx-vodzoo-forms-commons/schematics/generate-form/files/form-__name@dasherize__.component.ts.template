@@ -1,0 +1,40 @@
+import { ChangeDetectionStrategy, Component, inject, Signal } from '@angular/core';
+import { Form, FormConfigDirective, FormControlsConfigChange, FormDirective, formProviders } from 'ngx-vodzoo-forms-commons';
+import { <%= classify(name) %>, Form<%= classify(name) %>Service } from './service/form-<%= dasherize(name) %>.service';
+import { ReactiveFormsModule } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
+<% formComponentImports.forEach(importLine => { %><%= importLine %>
+<% }) %>
+
+@Component({
+  selector: '<%= formSelectorPrefix %>-form-<%= dasherize(name) %>',
+  imports: [ReactiveFormsModule],
+  templateUrl: './form-<%= dasherize(name) %>.component.html',
+  styleUrl: './form-<%= dasherize(name) %>.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [
+    formProviders(Form<%= classify(name) %>Service),<% if (isCustomFormDirectiveClass) { %>
+    {
+      provide: FormDirective,
+      useExisting: <%= formDirectiveClass.split("<")[0] %>,
+    },<% } %>
+  ],
+  hostDirectives: [
+    {
+      directive: <%= formDirectiveClass.split("<")[0] %>,
+      inputs: ['clearForm', 'form', 'initialData', 'showErrors'],
+      outputs: ['valueChanged', 'formCreated', 'invalidFields'],
+    },
+    {
+      directive: <%= formConfigDirectiveClass.split("<")[0] %>,
+      inputs: ['formControlsConfig', 'formControlsLogic2'],
+      outputs: [],
+    },
+  ],
+})
+export class Form<%= classify(name) %>Component implements <%= formType %> {
+  public formDirective: <%= formDirectiveClass %> = inject(<%= formDirectiveClass %>);
+  public formConfigDirective: <%= formConfigDirectiveClass %> = inject(<%= formConfigDirectiveClass.split("<")[0] %>);
+
+  protected config: Signal<<%= formControlsConfigChangeType %> | undefined> = toSignal(this.formConfigDirective.controlsConfigChange);
+}

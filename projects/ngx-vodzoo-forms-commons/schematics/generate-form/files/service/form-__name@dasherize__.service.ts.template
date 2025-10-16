@@ -1,0 +1,45 @@
+import { Injectable } from '@angular/core';
+import { FormControl, FormGroup } from '@angular/forms';
+<% formServiceImports.forEach(importLine => { %><%= importLine %>
+<% }) %>
+
+export interface <%= classify(name) %> {
+  <% fields.forEach(field => { %><%= field.name %>: FormControl<<%= field.controlModel ?? 'string | null' %>>;
+  <% }) %>
+}
+
+@Injectable()
+export class Form<%= classify(name) %>Service extends <%= formServiceClass %> {
+  protected override fromGroupConfig(
+    initialValue?: <%= formValueType %> | null,
+    initialDisabledState?: <%= formDisabledStateType %> | null,
+    initialValidators?: <%= formValidatorsType %> | null,
+    index?: number | null,
+  ): FormGroup<<%= classify(name) %>> {
+    return this.fb.group({
+      <% fields.forEach(field => { %><%= field.name %>: this.createNullableFormControl(
+        initialValue?.<%= field.name %>,
+        initialDisabledState?.<%= field.name %>?.(index),
+        [...(initialValidators?.<%= field.name %>?.(index) ?? []),
+      ]),
+      <% }) %>
+    });
+  }
+
+  protected override formFieldsConfig(): <%= formControlsConfigType %> {
+    return {
+      <% fields.filter(field => field.formFieldConfig).forEach(field => { %><%= field.name %>: (): <%= formFieldConfigType %><<%= field.formFieldConfigModel %>> => {
+        return <%= field.formFieldConfigSerialized %>;
+      },
+      <% }) %>
+    };
+  }
+
+  protected override formFieldsLogic2(): <%= formControlsLogic2Type %> {
+    return {
+      <% fields.filter(field => field.formFieldLogic).forEach(field => { %><%= field.name %>: (args: <%= formFieldLogic2FnSpecType %>): void => {
+      },
+      <% }) %>
+    };
+  }
+}
