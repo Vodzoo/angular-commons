@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "generate-form",
+  "title": "Form Generator",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nazwa formularza"
+    },
+    "formSelectorPrefix": {
+      "type": "string",
+      "description": "Prefix selektora formularza"
+    },
+    "componentSelectorPrefix": {
+      "type": "string",
+      "description": "Prefix selektora komponentu"
+    },
+    "commonFieldInputs": {
+      "type": "string",
+      "description": "Inputy komponentu jako tablica stringów",
+      "examples": ["'[\\\"config\\\", \\\"configFormField\\\"]'"]
+    },
+    "formServiceClass": {
+      "type": "string",
+      "description": "Klasa serwisu",
+      "examples": ["@Injectable()\nexport class MyFormService<T extends { [K in keyof T]: AbstractControl<any, any> }> extends FormService<T, MyAppFormFieldConfig<any>, MyFormTypes> {}"]
+    },
+    "formValueType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormValue<T> = FormValue<T, MyFormTypes>;"]
+    },
+    "formDisabledStateType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormDisabledState<T> = FormDisabledState<T, MyFormTypes>;"]
+    },
+    "formValidatorsType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormValidators<T> = FormValidators<T, MyFormTypes>;"]
+    },
+    "formControlsConfigType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormControlsConfig<T> = FormControlsConfig<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "formControlsLogic2Type": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["export type MyFormControlsLogic2<T> = FormControlsLogic2<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+    },
+    "formFieldConfigType": {
+      "type": "string",
+      "description": "Interface",
+      "examples": ["interface MyAppFormFieldConfig<T, R = any> {label?: string; enableTouchOnInitialError?: EnableTouchOnInitialErrorFn<R>; configFormField?: Partial<MyFormFieldConfig>; config?: Partial<T>;}"]
+    },
+    "fields": {
+      "type": "string",
+      "description": "Lista pól formularza"
+    }
+  },
+  "required": ["name", "fields"]
+}
