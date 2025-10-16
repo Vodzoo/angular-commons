@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../node_modules/@angular-devkit/schematics/collection-schema.json",
+  "schematics": {
+    "ng-add": {
+      "description": "Add my library to the project.",
+      "factory": "./ng-add/index#ngAdd",
+      "schema": "./ng-add/schema.json"
+    },
+    "form-generator": {
+      "description": "Generuje komponent formularza",
+      "factory": "./form-generator/index#formGenerator",
+      "schema": "./form-generator/schema.json"
+    }
+  }
+}

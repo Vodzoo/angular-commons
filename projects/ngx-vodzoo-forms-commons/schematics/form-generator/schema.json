@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "form-generator",
+  "title": "Form Generator",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nazwa formularza"
+    },
+    "formSelectorPrefix": {
+      "type": "string",
+      "description": "Prefix selektora formularza"
+    },
+    "componentSelectorPrefix": {
+      "type": "string",
+      "description": "Prefix selektora komponentu"
+    },
+    "commonFieldInputs": {
+      "type": "string",
+      "description": "Inputy komponentu jako tablica stringów np. ['config', 'formFieldConfig']"
+    },
+    "fields": {
+      "type": "string",
+      "description": "Lista pól formularza"
+    }
+  },
+  "required": ["name", "fields"]
+}

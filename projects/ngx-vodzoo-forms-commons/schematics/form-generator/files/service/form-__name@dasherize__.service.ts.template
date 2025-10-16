@@ -1,0 +1,46 @@
+import { Injectable } from '@angular/core';
+import { FormControl, FormGroup } from '@angular/forms';
+import {
+  FormControlsConfig,
+  FormControlsLogic2,
+  FormDisabledState,
+  FormService,
+  FormValidators,
+  FormValue,
+} from 'ngx-vodzoo-forms-commons';
+import { AppAllowedTypes, AppFormFieldConfig } from '../../../../app.config';
+
+export interface <%= classify(name) %> {
+  <% fields.forEach(field => { %><%= field.name %>: FormControl<<%= field.controlModel ?? 'string | null' %>>;
+  <% }) %>
+}
+
+@Injectable()
+export class Form<%= classify(name) %>Service extends FormService<<%= classify(name) %>, AppFormFieldConfig<any>, AppAllowedTypes> {
+  protected override fromGroupConfig(
+    initialValue?: FormValue<<%= classify(name) %>, AppAllowedTypes> | null,
+    initialDisabledState?: FormDisabledState<<%= classify(name) %>, AppAllowedTypes> | null,
+    initialValidators?: FormValidators<<%= classify(name) %>, AppAllowedTypes> | null,
+    index?: number | null,
+  ): FormGroup<<%= classify(name) %>> {
+    return this.fb.group({
+      <% fields.forEach(field => { %><%= field.name %>: this.createNullableFormControl(initialValue?.<%= field.name %>, initialDisabledState?.<%= field.name %>?.(index), [
+          ...(initialValidators?.<%= field.name %>?.(index) ?? []),
+        ]),
+      <% }) %>
+    });
+  }
+
+  protected override formFieldsConfig(): FormControlsConfig<<%= classify(name) %>, AppFormFieldConfig<any>, AppAllowedTypes> {
+    return {
+      <% fields.forEach(field => { %><% if (field.formFieldConfigSerialized) { %><%= field.name %>: (): AppFormFieldConfig<<%= field.formFieldConfigModel %>> => {
+            return <%= field.formFieldConfigSerialized %>;
+          },<% } %>
+      <% }) %>
+    };
+  }
+
+  protected override formFieldsLogic2(): FormControlsLogic2<<%= classify(name) %>, AppFormFieldConfig<any>, AppAllowedTypes> {
+    return {};
+  }
+}
