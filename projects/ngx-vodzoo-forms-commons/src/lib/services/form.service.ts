@@ -231,7 +231,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
   public mergeConfigWith(newConfig: FormControlsConfig<T, UserConfig, UserTypes>, opts?: { mergeArrays?: boolean; skipMerging?: (target: any, source: any) => boolean }, key?: string): FormControlsConfig<T, UserConfig, UserTypes> {
-    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = key ? (this.getFormFieldsConfig() as any)[key] : this.getFormFieldsConfig();
+    const defaultConfig: FormControlsConfig<T, UserConfig, UserTypes> = key ? ((this.getFormFieldsConfig() as any)[key] ?? {}) : this.getFormFieldsConfig();
     const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = defaultConfig;
 
     Object.keys(newConfig).forEach(key => {
