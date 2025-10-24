@@ -10,7 +10,14 @@ export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R,
       .pipe(
         filter(isNonNullable),
         switchMap(methodParams => {
-          const comp: Observable<R> | R = args.computation({methodParams, previousMethodParams, previousMethodValue});
+          let comp: Observable<R> | R;
+          try {
+            comp = args.computation({methodParams, previousMethodParams, previousMethodValue});
+          } catch (error) {
+            console.error(error);
+            args.onError?.(error);
+            return EMPTY;
+          }
           return isObservable(comp) ? comp.pipe(
             catchError((error) => {
               console.error(error);
