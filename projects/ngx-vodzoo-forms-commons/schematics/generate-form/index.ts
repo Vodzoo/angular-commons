@@ -14,6 +14,7 @@ export function generateForm(options: Options): Rule {
   options.commonFieldInputs = options.commonFieldInputs ? JSON.parse(options.commonFieldInputs as any) : [];
   options.formServiceImports = options.formServiceImports ? JSON.parse(options.formServiceImports as any) : [];
   options.formComponentImports = options.formComponentImports ? JSON.parse(options.formComponentImports as any) : [];
+  options.formComponentImportsArray = options.formComponentImportsArray ? JSON.parse(options.formComponentImportsArray as any) : [];
 
   const fields = options.fields
     .map((field) => ({
@@ -30,6 +31,9 @@ export function generateForm(options: Options): Rule {
       formSelectorPrefix: options.formSelectorPrefix ?? 'app',
       componentSelectorPrefix: options.componentSelectorPrefix ?? '',
       isCustomFormDirectiveClass: !!options.formDirectiveClass,
+      isCustomFormControlsConfigChangeType: !!options.formControlsConfigChangeType,
+      isCustomFormConfigDirectiveClass: !!options.formConfigDirectiveClass,
+      isCustomFormType: !!options.formType,
       formDirectiveClass: options.formDirectiveClass ? `${options.formDirectiveClass}<${strings.classify(options.name)}>` : `FormDirective<${strings.classify(options.name)}, any, Date>`,
       formConfigDirectiveClass: options.formConfigDirectiveClass ? `${options.formConfigDirectiveClass}<${strings.classify(options.name)}>` : `FormConfigDirective<${strings.classify(options.name)}, any, Date>`,
       formServiceClass: options.formServiceClass ? `${options.formServiceClass}<${strings.classify(options.name)}>` : `FormService<${strings.classify(options.name)}, any, Date>`,
@@ -42,7 +46,7 @@ export function generateForm(options: Options): Rule {
       formControlsLogic2Type: options.formControlsLogic2Type ? `${options.formControlsLogic2Type}<${strings.classify(options.name)}>` : `FormControlsLogic2<${strings.classify(options.name)}, any, Date>`,
       formFieldLogic2FnSpecType: options.formFieldLogic2FnSpecType ? `${options.formFieldLogic2FnSpecType}<${strings.classify(options.name)}>` : `FormFieldLogic2FnSpec<${strings.classify(options.name)}, any, Date>`,
       formFieldConfigType: options.formFieldConfigType ?? 'any',
-      fields
+      fields,
     }),
     move(`${options.path ?? ''}form-${strings.dasherize(options.name)}`)
   ]);
@@ -75,6 +79,7 @@ interface Options {
   formServiceClass: string;
   formServiceImports: string[];
   formComponentImports: string[];
+  formComponentImportsArray: string[];
   formValueType: string;
   formType: string;
   formDisabledStateType: string;

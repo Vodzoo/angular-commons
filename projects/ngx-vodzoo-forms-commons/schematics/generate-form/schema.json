@@ -46,6 +46,11 @@
       "description": "Imports",
       "examples": ["'[ \"import { Injectable } from \\\"@angular/core\\\";\", \"import { FormControl, FormGroup } from \\\"@angular/forms\\\";\" ]'"]
     },
+    "formComponentImportsArray": {
+      "type": "string",
+      "description": "Components imports",
+      "examples": ["'[ \"MyInputComponent\", \"MySelectComponent\" ]'"]
+    },
     "formValueType": {
       "type": "string",
       "description": "Interface",

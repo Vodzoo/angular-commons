@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, Signal } from '@angular/core';
-import { Form, FormConfigDirective, FormControlsConfigChange, FormDirective, formProviders } from 'ngx-vodzoo-forms-commons';
+import {<% if (!isCustomFormType) { %> Form,<% } %><% if (!isCustomFormConfigDirectiveClass) { %> FormConfigDirective,<% } %><% if (!isCustomFormControlsConfigChangeType) { %> FormControlsConfigChange,<% } %> FormDirective, formProviders } from 'ngx-vodzoo-forms-commons';
 import { <%= classify(name) %>, Form<%= classify(name) %>Service } from './service/form-<%= dasherize(name) %>.service';
 import { ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -8,7 +8,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: '<%= formSelectorPrefix %>-form-<%= dasherize(name) %>',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule<% formComponentImportsArray.forEach(component => { %>, <%= component %><% }) %>],
   templateUrl: './form-<%= dasherize(name) %>.component.html',
   styleUrl: './form-<%= dasherize(name) %>.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
