@@ -11,8 +11,7 @@ import {markAsUiChange} from "../directives/form-field.directive";
 import {
   FormControlsConfig,
   FormFieldConfigFn,
-  FormControlsLogic,
-  FormControlsLogic2
+  FormControlsLogic
 } from "../directives/form-config.directive";
 import {setConfig, setDefaultConfig} from "../formConfig";
 import {MERGE_CONFIG, MergeConfig, mergeDeep} from "../mergeDeep";
@@ -211,16 +210,8 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  /**
-   * @deprecated Use getFormFieldsLogic2 with formFieldsLogic2() and input [formControlsLogic2]
-   */
   public getFormFieldsLogic(): FormControlsLogic<T, UserConfig, UserTypes> {
     return this.formFieldsLogic();
-  }
-
-
-  public getFormFieldsLogic2(): FormControlsLogic2<T, UserConfig, UserTypes> {
-    return this.formFieldsLogic2();
   }
 
 
@@ -255,26 +246,17 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
 
   /**
-   * @deprecated Use mergeLogic2With with getFormFieldsLogic2
-   */
-  public mergeLogicWith(newLogic: FormControlsLogic<T, UserConfig, UserTypes>): FormControlsLogic<T, UserConfig, UserTypes> {
-    const defaultLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.getFormFieldsLogic();
-    return mergeDeep(defaultLogic, newLogic);
-  }
-
-
-  /**
    * Example:
    * ```ts
-   * protected override formFieldsLogic2(): FormControlsLogic2<PersonBase, any, Date> {
+   * protected override formFieldsLogic(): FormControlsLogic<PersonBase, any, Date> {
    *     return {
-   *       address: this.formAddressService.mergeLogic2With({
+   *       address: this.formAddressService.mergeLogicWith({
    *         country: (spec) => {
-   *           this.formAddressService.getFormFieldsLogic2().country?.(spec); // run all logic from formAddressService
+   *           this.formAddressService.getFormFieldsLogic().country?.(spec); // run all logic from formAddressService
    *
-   *           const onInitFn: FormFieldLogic2FnSpecArgsFn<Address, any, Date> = ({form, index, config}) => { // INIT LOGIC }
+   *           const onInitFn: FormFieldLogicFnSpecArgsFn<Address, any, Date> = ({form, index, config}) => { // INIT LOGIC }
    *
-   *           const onValueChangeFn: FormFieldLogic2FnSpecArgsFn<Address, any, Date> = ({form, index, config}): FormFieldLogic2FnState | void => {
+   *           const onValueChangeFn: FormFieldLogicFnSpecArgsFn<Address, any, Date> = ({form, index, config}): FormFieldLogicFnState | void => {
    *             if (form.controls.country.value === '12') {
    *               return {
    *                 stopExecution: true,
@@ -286,17 +268,17 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
    *           spec.onValueChange?.(onValueChangeFn); // logic will stop when form.controls.country.value === '12'
    *         },
    *         voivodeship: ({ onInit, onDestroy, onValueChange, onConfigChange, onLogicRecalculate }) => {
-   *           this.formAddressService.getFormFieldsLogic2().voivodeship?.({onValueChange, onConfigChange, onLogicRecalculate}); // no onInit and onDestroy logic will be triggered from formAddressService
+   *           this.formAddressService.getFormFieldsLogic().voivodeship?.({onValueChange, onConfigChange, onLogicRecalculate}); // no onInit and onDestroy logic will be triggered from formAddressService
    *           onInit?.(({form}) => console.log(form));
-   *           this.formAddressService.getFormFieldsLogic2().voivodeship?.({onInit}); // only onInit logic will be triggered from formAddressService
+   *           this.formAddressService.getFormFieldsLogic().voivodeship?.({onInit}); // only onInit logic will be triggered from formAddressService
    *         },
    *       }),
    *     };
    *   }
    *   ```
    */
-  public mergeLogic2With(newLogic: FormControlsLogic2<T, UserConfig, UserTypes>): FormControlsLogic2<T, UserConfig, UserTypes> {
-    const defaultLogic: FormControlsLogic2<T, UserConfig, UserTypes> = this.getFormFieldsLogic2();
+  public mergeLogicWith(newLogic: FormControlsLogic<T, UserConfig, UserTypes>): FormControlsLogic<T, UserConfig, UserTypes> {
+    const defaultLogic: FormControlsLogic<T, UserConfig, UserTypes> = this.getFormFieldsLogic();
     return mergeDeep(defaultLogic, newLogic);
   }
 
@@ -316,16 +298,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
   }
 
 
-  /**
-   * @deprecated Use formFieldsLogic2() with input [formControlsLogic2]
-   * @protected
-   */
   protected formFieldsLogic(): FormControlsLogic<T, UserConfig, UserTypes> {
-    return {};
-  }
-
-
-  protected formFieldsLogic2(): FormControlsLogic2<T, UserConfig, UserTypes> {
     return {};
   }
 
