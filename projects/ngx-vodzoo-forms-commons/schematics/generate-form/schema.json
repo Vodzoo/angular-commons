@@ -81,20 +81,20 @@
       "description": "Interface",
       "examples": ["export type MyFormControlsConfigChange<T> = FormControlsConfigChange<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
     },
-    "formControlsLogic2Type": {
+    "formControlsLogicType": {
       "type": "string",
       "description": "Interface",
-      "examples": ["export type MyFormControlsLogic2<T> = FormControlsLogic2<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+      "examples": ["export type MyFormControlsLogic<T> = FormControlsLogic<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
     },
     "formFieldConfigType": {
       "type": "string",
       "description": "Interface",
       "examples": ["interface MyAppFormFieldConfig<T, R = any> {label?: string; enableTouchOnInitialError?: EnableTouchOnInitialErrorFn<R>; configFormField?: Partial<MyFormFieldConfig>; config?: Partial<T>;}"]
     },
-    "formFieldLogic2FnSpecType": {
+    "formFieldLogicFnSpecType": {
       "type": "string",
       "description": "Interface",
-      "examples": ["export type MyFormFieldLogic2FnSpec<T extends { [K in keyof T]: AbstractControl<any, any> }> = FormFieldLogic2FnSpec<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
+      "examples": ["export type MyFormFieldLogicFnSpec<T extends { [K in keyof T]: AbstractControl<any, any> }> = FormFieldLogicFnSpec<T, MyAppFormFieldConfig<any>, MyFormTypes>;"]
     },
     "fields": {
       "type": "string",

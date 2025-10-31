@@ -43,8 +43,8 @@ export function generateForm(options: Options): Rule {
       formValidatorsType: options.formValidatorsType ? `${options.formValidatorsType}<${strings.classify(options.name)}>` : `FormValidators<${strings.classify(options.name)}, Date>`,
       formControlsConfigType: options.formControlsConfigType ? `${options.formControlsConfigType}<${strings.classify(options.name)}>` : `FormControlsConfig<${strings.classify(options.name)}, any, Date>`,
       formControlsConfigChangeType: options.formControlsConfigChangeType ? `${options.formControlsConfigChangeType}<${strings.classify(options.name)}>` : `FormControlsConfigChange<${strings.classify(options.name)}, any, Date>`,
-      formControlsLogic2Type: options.formControlsLogic2Type ? `${options.formControlsLogic2Type}<${strings.classify(options.name)}>` : `FormControlsLogic2<${strings.classify(options.name)}, any, Date>`,
-      formFieldLogic2FnSpecType: options.formFieldLogic2FnSpecType ? `${options.formFieldLogic2FnSpecType}<${strings.classify(options.name)}>` : `FormFieldLogic2FnSpec<${strings.classify(options.name)}, any, Date>`,
+      formControlsLogicType: options.formControlsLogicType ? `${options.formControlsLogicType}<${strings.classify(options.name)}>` : `FormControlsLogic<${strings.classify(options.name)}, any, Date>`,
+      formFieldLogicFnSpecType: options.formFieldLogicFnSpecType ? `${options.formFieldLogicFnSpecType}<${strings.classify(options.name)}>` : `FormFieldLogicFnSpec<${strings.classify(options.name)}, any, Date>`,
       formFieldConfigType: options.formFieldConfigType ?? 'any',
       fields,
     }),
@@ -86,8 +86,8 @@ interface Options {
   formValidatorsType: string;
   formControlsConfigType: string;
   formControlsConfigChangeType: string;
-  formControlsLogic2Type: string;
-  formFieldLogic2FnSpecType: string;
+  formControlsLogicType: string;
+  formFieldLogicFnSpecType: string;
   formFieldConfigType: string;
   fields: Field[];
   path: string;

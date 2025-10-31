@@ -35,9 +35,9 @@ export class Form<%= classify(name) %>Service extends <%= formServiceClass %> {
     };
   }
 
-  protected override formFieldsLogic2(): <%= formControlsLogic2Type %> {
+  protected override formFieldsLogic(): <%= formControlsLogicType %> {
     return {
-      <% fields.filter(field => field.formFieldLogic).forEach(field => { %><%= field.name %>: (args: <%= formFieldLogic2FnSpecType %>): void => {
+      <% fields.filter(field => field.formFieldLogic).forEach(field => { %><%= field.name %>: (args: <%= formFieldLogicFnSpecType %>): void => {
       },
       <% }) %>
     };

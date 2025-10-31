@@ -27,7 +27,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
     },
     {
       directive: <%= formConfigDirectiveClass.split("<")[0] %>,
-      inputs: ['formControlsConfig', 'formControlsLogic2'],
+      inputs: ['formControlsConfig', 'formControlsLogic'],
       outputs: [],
     },
   ],
