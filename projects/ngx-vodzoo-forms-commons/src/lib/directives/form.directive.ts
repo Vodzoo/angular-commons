@@ -1,5 +1,6 @@
 import {
   ChangeDetectorRef,
+  computed,
   DestroyRef,
   Directive,
   effect,
@@ -15,7 +16,10 @@ import {
   OnInit,
   Output,
   Provider,
-  Type
+  Signal,
+  signal,
+  Type,
+  WritableSignal
 } from '@angular/core';
 import {
   AbstractControl,
@@ -99,12 +103,20 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * Fields
    * ------------------------------------
    */
-  private _initialData?: FormValue<T, UserTypes>;
-  private _formIndex?: number;
-  private _form: FormGroup<T> = this.formService.getFormGroup();
-  private readonly elementLocalName: string = this.elementRef.nativeElement.localName;
+  private readonly _initialData$: WritableSignal<FormValue<T, UserTypes> | undefined> = signal(undefined);
+  public readonly initialData$: Signal<FormValue<T, UserTypes> | undefined> = this._initialData$.asReadonly();
+  private readonly _formIndex$: WritableSignal<number | undefined> = signal(undefined);
+  public readonly formIndex$: Signal<number | undefined> = this._formIndex$.asReadonly();
+  private readonly _form$: WritableSignal<FormGroup<T>> = signal(this.formService.getFormGroup());
+  public readonly form$: Signal<FormGroup<T>> = this._form$.asReadonly();
+  private readonly _elementLocalName$: Signal<string> = signal(this.elementRef.nativeElement.localName).asReadonly();
+  private readonly componentId$: Signal<string> = computed(() => {
+    const index = this.formIndex$();
+    const formIndex: string = index || index === 0 ? `_${index}` : '';
+    return `${this._elementLocalName$()}${formIndex}`;
+  });
   private rootForm: boolean = true;
-  private readonly initialClasses: string[] = ['form', this.elementLocalName];
+  private readonly initialClasses: string[] = ['form', this._elementLocalName$()];
   private readonly _formReady$: BehaviorSubject<FormGroup<T> | null> = new BehaviorSubject<FormGroup<T> | null>(null);
   public readonly formReady: Observable<FormGroup<T>> = this._formReady$.asObservable().pipe(filter(Boolean), take(1));
 
@@ -123,25 +135,26 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   @Input() public clearForm?: Observable<{ value?: FormValue<T, UserTypes>, options?: { onlySelf?: boolean; emitEvent?: boolean; } } | undefined>; // works on init only
   @Input() public clearFormWithInitialData?: boolean = this.formConfig.clearFormWithInitialData; // initial data or form group data
   @Input() public set initialData(value: FormValue<T, UserTypes> | undefined) {
-    if (this._initialData || !value) {
+    if (this._initialData$() || !value) {
       return;
     }
-    this._initialData = this.formService.getFormGroup(value).getRawValue();
+    this._initialData$.set(this.formService.getFormGroup(value).getRawValue());
   };
   @Input() public set form(value: FormGroup<T>) {
     this.rootForm = false;
-    this._form = value;
+    this._form$.set(value);
   }
   @Input() public set patchForm(value: FormValue<T, UserTypes> | undefined | null) {
     if (this.rootForm && value !== null && value !== undefined) {
-      this.form.patchValue(value as any);
+      this.form$().patchValue(value as any);
     }
   }
   @Input() public set formIndex(value: number | undefined) {
-    this._formIndex = value;
+    this._formIndex$.set(value);
     this.classes = [...this.initialClasses];
-    if (this.formIndex || this.formIndex === 0) {
-      this.classes.push(`form-index-${this.formIndex}`);
+    const index = this.formIndex$();
+    if (index || index === 0) {
+      this.classes.push(`form-index-${index}`);
     }
   }
 
@@ -180,23 +193,24 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * ------------------------------------
    */
   public get componentId(): string {
-    const formIndex: string = this.formIndex || this.formIndex === 0 ? `_${this.formIndex}` : '';
-    return `${this.elementLocalName}${formIndex}`
+    const index = this.formIndex$();
+    const formIndex: string = index || index === 0 ? `_${index}` : '';
+    return `${this._elementLocalName$()}${formIndex}`
   }
 
 
   public get form(): FormGroup<T> {
-    return this._form;
+    return this.form$();
   }
 
 
   public get formIndex(): number | undefined {
-    return this._formIndex;
+    return this.formIndex$();
   }
 
 
   public get initialData(): FormValue<T, UserTypes> | undefined {
-    return this._initialData;
+    return this.initialData$();
   };
 
 
@@ -211,18 +225,18 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     const conditionFn: ShowErrorsConditionFn<T> | undefined = showErrors.withCondition;
     const value: boolean | undefined = showErrors.withValue;
     if (conditionFn) {
-      const markAsTouched: Subscription = merge(this.form.valueChanges, this.form.statusChanges.pipe(startWith(this.form.status)))
+      const markAsTouched: Subscription = merge(this.form$().valueChanges, this.form$().statusChanges.pipe(startWith(this.form$().status)))
         .pipe(
           debounceTime(0),
-          filter(() => conditionFn({form: this.form})),
-          tap(() => markAllAsTouched(this.form)),
+          filter(() => conditionFn({form: this.form$()})),
+          tap(() => markAllAsTouched(this.form$())),
         ).subscribe();
       onCleanup(() => {
         markAsTouched.unsubscribe();
       });
     }
     if (value === true) {
-      markAllAsTouched(this.form);
+      markAllAsTouched(this.form$());
     }
   });
 
@@ -242,12 +256,12 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     this.handleInvalidFieldsChanges().subscribe();
     this.handleValueChanges().subscribe();
     this.handlePatchFormValueChanges().subscribe();
-    this._formReady$.next(this.form)
+    this._formReady$.next(this.form$())
 
     if (this.rootForm) {
       this.sendFormCreated();
       this.sendComponentId();
-      this.sendStatusChanged({current: this.form.status, previous: this.form.status});
+      this.sendStatusChanged({current: this.form$().status, previous: this.form$().status});
       this.handleEvents().subscribe();
     }
   }
@@ -261,7 +275,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * ------------------------------------
    */
   public getFormValues(): FormValues<T, UserTypes> {
-    return {value: this.form.value, rawValue: this.form.getRawValue() as FormRawValue<T>};
+    return {value: this.form$().value, rawValue: this.form$().getRawValue() as FormRawValue<T>};
   }
 
 
@@ -276,7 +290,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
   private sendFormCreated(): void {
     if (this.formCreated.observed) {
-      this.formCreated.emit(this.form);
+      this.formCreated.emit(this.form$());
     }
   }
 
@@ -290,7 +304,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
   private sendComponentId() {
     if (this.id.observed) {
-      this.id.emit(this.componentId);
+      this.id.emit(this.componentId$());
     }
   }
 
@@ -301,16 +315,16 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     let rawDataChanged: boolean = false;
     let firstUiChange: boolean = true;
     const storageSaveOn: StorageSaveOn[] = [];
-    return this.form.valueChanges
+    return this.form$().valueChanges
       .pipe(
-        startWith(this.form.value),
+        startWith(this.form$().value),
         tap(() => this.cdr.markForCheck()),
         filter(() => this.rootForm),
-        map<FormValue<T, UserTypes>, FormValues<T, UserTypes>>(value => ({value, rawValue: this.form.getRawValue() as FormRawValue<T>})),
+        map<FormValue<T, UserTypes>, FormValues<T, UserTypes>>(value => ({value, rawValue: this.form$().getRawValue() as FormRawValue<T>})),
         pairwise(),
         tap((value) => {
           storageSaveOn.length = 0;
-          uiChange = isDataChangedByUi(this.form);
+          uiChange = isDataChangedByUi(this.form$());
           dataChanged = this.formConfig.dataChangedFn(value[0].value, value[1].value);
           rawDataChanged = this.formConfig.dataChangedFn(value[0].rawValue, value[1].rawValue);
           storageSaveOn.push(uiChange ? 'userChange' : 'nonUserChange');
@@ -320,10 +334,10 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
           if (rawDataChanged) {
             storageSaveOn.push('rawDataChange');
           }
-          resetUiChange(this.form);
+          resetUiChange(this.form$());
         }),
         filter(() => dataChanged || rawDataChanged),
-        tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId, this.saveInStorage, storageSaveOn) : null),
+        tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId$(), this.saveInStorage, storageSaveOn) : null),
         map<[FormValues<T, UserTypes>, FormValues<T, UserTypes>], ValueChanges<T, UserTypes>>(value => ({
           uiChange,
           dataChanged,
@@ -337,7 +351,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
             firstUiChange = false;
           }
         }),
-        tap((value: ValueChanges<T, UserTypes>) => setRootFormValueChanges(this.form, value)),
+        tap((value: ValueChanges<T, UserTypes>) => setRootFormValueChanges(this.form$(), value)),
         tap((value: ValueChanges<T, UserTypes>) => this.valueChanged.emit(value)),
         takeUntilDestroyed(this.destroyRef)
       ) as Observable<ValueChanges<T, UserTypes>>;
@@ -345,9 +359,9 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
 
   private handleStatusChanges(): Observable<StatusChanges> {
-    return this.form.statusChanges
+    return this.form$().statusChanges
       .pipe(
-        startWith(this.form.status),
+        startWith(this.form$().status),
         tap(() => this.cdr.markForCheck()),
         filter(() => this.statusChanged.observed && this.rootForm),
         pairwise(),
@@ -363,13 +377,13 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
 
   private handleInvalidFieldsChanges(): Observable<string[]> {
-    return this.form.statusChanges
+    return this.form$().statusChanges
       .pipe(
-        startWith(this.form.status),
+        startWith(this.form$().status),
         tap(() => this.cdr.markForCheck()),
         filter(() => this.invalidFields.observed),
         debounceTime(0),
-        map(value => value === 'VALID' ? [] : this.getLabels(this.findInvalidControls(this.form))),
+        map(value => value === 'VALID' ? [] : this.getLabels(this.findInvalidControls(this.form$()))),
         tap(value => this.invalidFields.emit(value)),
         takeUntilDestroyed(this.destroyRef)
       );
@@ -408,9 +422,9 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private handlePatchFormValueChanges(): Observable<FormValue<T, UserTypes>> {
     return this.formService.patchFormValueChanges
       .pipe(
-        filter((value: {componentId: string, value: FormValue<T, UserTypes>}) => value.componentId === this.componentId),
+        filter((value: {componentId: string, value: FormValue<T, UserTypes>}) => value.componentId === this.componentId$()),
         map((value: {componentId: string, value: FormValue<T, UserTypes>}) => value.value),
-        tap(value => this.form.patchValue(value as any)),
+        tap(value => this.form$().patchValue(value as any)),
         takeUntilDestroyed(this.destroyRef)
       );
   }
@@ -430,12 +444,13 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     if (!this.rootForm) {
       return;
     }
-    const initialValue: FormValue<T, UserTypes> | undefined = this.saveDataWithService ? this.formService.getFormValues(this.componentId)?.rawValue as FormValue<T, UserTypes> ?? this.initialData : this.initialData;
-    this._form = this.formService.getFormGroup(initialValue, this.initialDisabledState, this.initialValidators);
-    if (!this.initialData) {
+    const initialData: FormValue<T, UserTypes> | undefined = this.initialData$();
+    const initialValue: FormValue<T, UserTypes> | undefined = this.saveDataWithService ? this.formService.getFormValues(this.componentId$())?.rawValue as FormValue<T, UserTypes> ?? initialData : initialData;
+    this._form$.set(this.formService.getFormGroup(initialValue, this.initialDisabledState, this.initialValidators));
+    if (!initialData) {
       this.initialData = this.formService.initialValue ?? this.formService.getFormGroup().getRawValue();
     }
-    setRootFormInitialValue(this._form, this.initialData);
+    setRootFormInitialValue(this.form$(), this.initialData$() ?? {}); //read signal once again, not const initialData
   }
 
 
@@ -450,13 +465,13 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     }
     this.clearForm
       .pipe(
-        tap((clearObject) => clearObject?.options?.emitEvent !== false ? markAsUiChange(this.form) : null),
-        tap(() => markAsResetChange(this.form)),
+        tap((clearObject) => clearObject?.options?.emitEvent !== false ? markAsUiChange(this.form$()) : null),
+        tap(() => markAsResetChange(this.form$())),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe(clearObject => {
-        this.form.reset(clearObject?.value ?? (this.clearFormWithInitialData ? this.initialData as any : this.formService.getFormGroup().getRawValue()), clearObject?.options);
-        resetResetChange(this.form);
+        this.form$().reset(clearObject?.value ?? (this.clearFormWithInitialData ? this.initialData$() as any : this.formService.getFormGroup().getRawValue()), clearObject?.options);
+        resetResetChange(this.form$());
       });
   }
 
@@ -465,7 +480,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     if (!this.rootForm) {
       return;
     }
-    this.formService.defaultComponentId = this.elementLocalName;
+    this.formService.defaultComponentId = this._elementLocalName$();
   }
 }
 

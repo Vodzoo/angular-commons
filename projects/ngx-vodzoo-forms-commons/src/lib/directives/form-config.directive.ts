@@ -201,12 +201,12 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
       return;
     }
 
-    let status: FormControlStatus = this.formDirective.form.status;
-    this.formDirective.form.root.valueChanges.pipe(
+    let status: FormControlStatus = this.formDirective.form$().status;
+    this.formDirective.form$().root.valueChanges.pipe(
       debounceTime(0),
       distinctUntilChanged((prev, cur) => {
-        const curStatus: FormControlStatus = this.formDirective.form.status;
-        const curStatusRoot: FormControlStatus = this.formDirective.form.root.status;
+        const curStatus: FormControlStatus = this.formDirective.form$().status;
+        const curStatusRoot: FormControlStatus = this.formDirective.form$().root.status;
         const statusChanged: boolean = curStatus !== status;
         const statusChangedRoot: boolean = curStatusRoot !== curStatus;
         if (statusChanged || statusChangedRoot) {
@@ -275,7 +275,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     const change: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
     Object.keys(mergedConfig).forEach((key: string) => {
       if ((typeof (mergedConfig as any)[key]) === 'function') {
-        (change as any)[key] = ((mergedConfig as any)[key] as FormFieldConfigFn<T, any, any>)(this.formDirective.form, this._defaultFormFieldsConfigChange, this.formDirective.formIndex);
+        (change as any)[key] = ((mergedConfig as any)[key] as FormFieldConfigFn<T, any, any>)(this.formDirective.form$(), this._defaultFormFieldsConfigChange, this.formDirective.formIndex$());
       }
     })
     return change;
@@ -313,9 +313,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     fieldLogic({
       onInit: (argsFn) => {
         argsFn?.({
-          form: this.formDirective.form,
+          form: this.formDirective.form$(),
           config,
-          index: this.formDirective.formIndex,
+          index: this.formDirective.formIndex$(),
         });
       }
     });
@@ -325,9 +325,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     fieldLogic({
       onDestroy: (argsFn) => {
         argsFn?.({
-          form: this.formDirective.form,
+          form: this.formDirective.form$(),
           config,
-          index: this.formDirective.formIndex,
+          index: this.formDirective.formIndex$(),
         });
       }
     });
@@ -341,9 +341,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     fieldLogic({
       onConfigChange: (argsFn) => {
         this.configChangeState = argsFn?.({
-          form: this.formDirective.form,
+          form: this.formDirective.form$(),
           config,
-          index: this.formDirective.formIndex,
+          index: this.formDirective.formIndex$(),
         });
       }
     });
@@ -357,9 +357,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     fieldLogic({
       onValueChange: (argsFn) => {
         this.valueChangeState = argsFn?.({
-          form: this.formDirective.form,
+          form: this.formDirective.form$(),
           config,
-          index: this.formDirective.formIndex,
+          index: this.formDirective.formIndex$(),
         });
       }
     });
@@ -373,9 +373,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     fieldLogic({
       onLogicRecalculate: (argsFn) => {
         this.recalculationState = argsFn?.({
-          form: this.formDirective.form,
+          form: this.formDirective.form$(),
           config,
-          index: this.formDirective.formIndex
+          index: this.formDirective.formIndex$()
         })
       }
     });
@@ -395,7 +395,7 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     Object.keys(config).forEach(key => {
       newConfig[key] = typeof config[key] === 'function' ? config[key] : { ...config[key] };
     });
-    setConfig(this.formDirective.form, newConfig);
+    setConfig(this.formDirective.form$(), newConfig);
     this._controlsConfig$.next(newConfig);
   }
 }
