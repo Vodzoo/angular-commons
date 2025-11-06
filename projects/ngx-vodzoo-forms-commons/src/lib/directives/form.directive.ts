@@ -14,7 +14,8 @@ import {
   Input,
   InputSignal,
   OnInit,
-  Output,
+  output,
+  OutputEmitterRef,
   Provider,
   Signal,
   signal,
@@ -110,11 +111,17 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private readonly _form$: WritableSignal<FormGroup<T>> = signal(this.formService.getFormGroup());
   public readonly form$: Signal<FormGroup<T>> = this._form$.asReadonly();
   private readonly _elementLocalName$: Signal<string> = signal(this.elementRef.nativeElement.localName).asReadonly();
-  private readonly componentId$: Signal<string> = computed(() => {
+  public readonly componentId$: Signal<string> = computed(() => {
     const index = this.formIndex$();
     const formIndex: string = index || index === 0 ? `_${index}` : '';
     return `${this._elementLocalName$()}${formIndex}`;
   });
+  private readonly _invalidFields$: WritableSignal<string[]> = signal([]);
+  public readonly invalidFields$: Signal<string[]> = this._invalidFields$.asReadonly();
+  private readonly _statusChanges$: WritableSignal<FormControlStatus | undefined> = signal(undefined);
+  public readonly statusChanges$: Signal<FormControlStatus | undefined> = this._statusChanges$.asReadonly();
+  private readonly _valueChanges$: WritableSignal<FormValue<T, UserTypes> | undefined> = signal(undefined);
+  public readonly valueChanges$: Signal<FormValue<T, UserTypes> | undefined> = this._valueChanges$.asReadonly();
   private rootForm: boolean = true;
   private readonly initialClasses: string[] = ['form', this._elementLocalName$()];
   private readonly _formReady$: BehaviorSubject<FormGroup<T> | null> = new BehaviorSubject<FormGroup<T> | null>(null);
@@ -166,12 +173,12 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * Outputs
    * ------------------------------------
    */
-  @Output() public id: EventEmitter<string> = new EventEmitter(); // root form only
-  @Output() public formCreated: EventEmitter<FormGroup<T>> = new EventEmitter(); // root form only
-  @Output() public valueChanged: EventEmitter<ValueChanges<T, UserTypes>> = new EventEmitter(); // root form only
-  @Output() public statusChanged: EventEmitter<StatusChanges> = new EventEmitter(); // root form only
-  @Output() public invalidFields: EventEmitter<string[]> = new EventEmitter(); // root form only
-  @Output() public eventEmitted: EventEmitter<FormEvent<any, string, any>> = new EventEmitter(); // root form only
+  public id: OutputEmitterRef<string> = output(); // root form only
+  public formCreated: OutputEmitterRef<FormGroup<T>> = output(); // root form only
+  public valueChanged: OutputEmitterRef<ValueChanges<T, UserTypes>> = output(); // root form only
+  public statusChanged: OutputEmitterRef<StatusChanges> = output(); // root form only
+  public invalidFields: OutputEmitterRef<string[]> = output(); // root form only
+  public eventEmitted: OutputEmitterRef<FormEvent<any, string, any>> = output(); // root form only
 
 
 
@@ -289,23 +296,17 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
 
   private sendFormCreated(): void {
-    if (this.formCreated.observed) {
-      this.formCreated.emit(this.form$());
-    }
+    this.formCreated.emit(this.form$());
   }
 
 
-  private sendStatusChanged(value?: StatusChanges): void {
-    if (this.statusChanged.observed) {
-      this.statusChanged.emit(value);
-    }
+  private sendStatusChanged(value: StatusChanges): void {
+    this.statusChanged.emit(value);
   }
 
 
   private sendComponentId() {
-    if (this.id.observed) {
-      this.id.emit(this.componentId$());
-    }
+    this.id.emit(this.componentId$());
   }
 
 
@@ -319,6 +320,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
       .pipe(
         startWith(this.form$().value),
         tap(() => this.cdr.markForCheck()),
+        tap(value => this._valueChanges$.set(value)),
         filter(() => this.rootForm),
         map<FormValue<T, UserTypes>, FormValues<T, UserTypes>>(value => ({value, rawValue: this.form$().getRawValue() as FormRawValue<T>})),
         pairwise(),
@@ -363,7 +365,8 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
       .pipe(
         startWith(this.form$().status),
         tap(() => this.cdr.markForCheck()),
-        filter(() => this.statusChanged.observed && this.rootForm),
+        tap(value => this._statusChanges$.set(value)),
+        filter(() => this.rootForm),
         pairwise(),
         filter(value => value[0] !== value[1]),
         map(value => ({
@@ -381,10 +384,10 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
       .pipe(
         startWith(this.form$().status),
         tap(() => this.cdr.markForCheck()),
-        filter(() => this.invalidFields.observed),
         debounceTime(0),
         map(value => value === 'VALID' ? [] : this.getLabels(this.findInvalidControls(this.form$()))),
         tap(value => this.invalidFields.emit(value)),
+        tap(value => this._invalidFields$.set(value)),
         takeUntilDestroyed(this.destroyRef)
       );
   }
@@ -433,7 +436,6 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private handleEvents(): Observable<FormEvent<any, string, any>> {
     return this.formEventService.events
       .pipe(
-        filter(() => this.eventEmitted.observed),
         tap(event => this.eventEmitted.emit(event)),
         takeUntilDestroyed(this.destroyRef)
       );
