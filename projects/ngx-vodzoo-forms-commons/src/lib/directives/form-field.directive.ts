@@ -2,13 +2,18 @@ import {
   ChangeDetectorRef,
   computed,
   Directive,
+  effect,
+  EffectRef,
   forwardRef,
   HostBinding,
   inject,
   InjectionToken,
   input,
   Input,
-  OnDestroy
+  OnDestroy,
+  signal,
+  Signal,
+  WritableSignal
 } from '@angular/core';
 import {
   AbstractControl,
@@ -51,6 +56,22 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   private readonly config: FormFieldConfig<T> = inject(FORM_FIELD_CONFIG);
 
 
+  /**
+   * Signals
+   */
+  public readonly formControl$: Signal<FormControl<T>> = signal(new FormControl()).asReadonly();
+  private readonly _fieldRequired$: WritableSignal<boolean> = signal(false);
+  public readonly fieldRequired$: Signal<boolean> = this._fieldRequired$.asReadonly();
+  private readonly _formControlName$: WritableSignal<string> = signal('');
+  public readonly formControlName$: Signal<string> = this._formControlName$.asReadonly();
+  private readonly _value$: WritableSignal<T | null> = signal(null);
+  public readonly value$: Signal<T | null> = this._value$.asReadonly();
+  private readonly _isDisabled$: WritableSignal<boolean> = signal(false);
+  public readonly isDisabled$: Signal<boolean> = this._isDisabled$.asReadonly();
+  private readonly _baseFormControl$: WritableSignal<AbstractControl<T> | undefined> = signal(undefined);
+  public readonly baseControl$: Signal<AbstractControl<T> | undefined> = this._baseFormControl$.asReadonly();
+  private readonly _validation$: WritableSignal<FormFieldValidation<T> | undefined> = signal(undefined);
+  public readonly validation$: Signal<FormFieldValidation<T> | undefined> = this._validation$.asReadonly();
 
 
   /**
@@ -58,24 +79,30 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    * Fields
    * ------------------------------------
    */
-  private readonly _formControl: FormControl<T> = new FormControl();
-  private _fieldRequired: boolean = false;
-  private _formControlName: string = '';
-  private _value: T | null = null;
-  private _isDisabled: boolean = false;
-  private _skip: boolean = false;
   private _changeRegistered: boolean = false;
-  private _baseFormControl?: AbstractControl<T>;
+  private _skip: boolean = false;
   private readonly _baseFormControlReady$: BehaviorSubject<AbstractControl<T> | null> = new BehaviorSubject<AbstractControl<T> | null>(null);
   private readonly _disabledStateChange$: Subject<boolean> = new Subject();
   private readonly _valueChange$: Subject<T> = new Subject();
   private readonly _validate$: Subject<FormFieldValidation<T>> = new Subject();
   private readonly _destroy$: Subject<void> = new Subject();
 
+  /**
+   * @deprecated use baseControl$ signal
+   */
   public readonly baseFormControlReady: Observable<AbstractControl<T>> = this._baseFormControlReady$.asObservable()
     .pipe(filter(Boolean), take(1));
+  /**
+   * @deprecated use isDisabled$ signal
+   */
   public readonly disabledStateChange: Observable<boolean> = this._disabledStateChange$.asObservable();
+  /**
+   * @deprecated use value$ signal
+   */
   public readonly valueChange: Observable<T> = this._valueChange$.asObservable();
+  /**
+   * @deprecated use validation$ signal
+   */
   public readonly validation: Observable<FormFieldValidation<T>> = this._validate$.asObservable();
 
 
@@ -89,12 +116,12 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   private _label: string = '';
   @Input() public set label(value: string) {
     this._label = value;
-    setLabel(this.baseControl, this.label);
+    setLabel(this.baseControl$(), this.label);
   };
   public get label(): string {
     return this._label;
   };
-  @Input({transform: (value: unknown) => typeof value !== 'function' ? () => null : value}) public vFormField?: (control: AbstractControl<T>) => ValidationErrors | null;
+  @Input({transform: (value: unknown) => typeof value === 'function' ? value : () => null}) public vFormField?: (control: AbstractControl<T>) => ValidationErrors | null;
 
   public enableTouchOnInitialError$ = input<EnableTouchOnInitialErrorFn<T> | undefined>(undefined, {alias: 'enableTouchOnInitialError'});
 
@@ -117,36 +144,55 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    */
   @HostBinding('class.form-field') private readonly formField: boolean = true;
   @HostBinding('class') public get formControlName(): string {
-    return this._formControlName;
+    return this.formControlName$();
   };
 
-  constructor() {
-    this.baseFormControlReady.subscribe(control => setLabel(control, this.label));
-  }
+
+  /**
+   * Effects
+   */
+  private readonly setLabel: EffectRef = effect(() => setLabel(this.baseControl$(), this.label));
+
 
   /**
    * ------------------------------------
    * Getters
    * ------------------------------------
    */
+
+  /**
+   * @deprecated use formControl$ signal
+   */
   public get formControl(): FormControl<T> {
-    return this._formControl;
+    return this.formControl$();
   }
 
+  /**
+   * @deprecated use fieldRequired$ signal
+   */
   public get fieldRequired(): boolean {
-    return this._fieldRequired;
+    return this.fieldRequired$();
   };
 
+  /**
+   * @deprecated use value$ signal
+   */
   public get value(): T | null {
-    return this._value;
+    return this.value$();
   };
 
+  /**
+   * @deprecated use isDisabled$ signal
+   */
   public get isDisabled(): boolean {
-    return this._isDisabled;
+    return this.isDisabled$();
   };
 
+  /**
+   * @deprecated use baseControl$ signal
+   */
   public get baseControl(): FormControl<T> | undefined {
-    return this._baseFormControl as FormControl<T> | undefined;
+    return this.baseControl$() as FormControl<T> | undefined;
   }
 
 
@@ -163,7 +209,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    */
   public onTouched = (): void => {};
   public onChange = (value: T): void => {
-    markAsUiChange(this._baseFormControl);
+    markAsUiChange(this.baseControl$());
     this._onChange(value);
   };
   private _onChange = (value: T): void => {};
@@ -172,16 +218,16 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
   public registerOnChange(fn: (value: T) => void): void {
     this._onChange = fn;
-    this.formControl.valueChanges
+    this.formControl$().valueChanges
       .pipe(
         tap(() => {
           if (this._skip) {
             return;
           }
-          if (isChangedByUiUnset(this.formControl) || isDataChangedByUi(this.formControl)) {
-            markAsUiChange(this._baseFormControl);
+          if (isChangedByUiUnset(this.formControl$()) || isDataChangedByUi(this.formControl$())) {
+            markAsUiChange(this.baseControl$());
           }
-          resetUiChange(this.formControl);
+          resetUiChange(this.formControl$());
         })
       )
       .subscribe(value => {
@@ -201,14 +247,14 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
 
   public writeValue(obj: T): void {
-    this._value = obj;
+    this._value$.set(obj);
     if (this._changeRegistered) {
       this._skip = true;
     }
-    if (isResetChange(this.baseControl)) {
-      this.formControl.reset(obj, {onlySelf: true});
+    if (isResetChange(this.baseControl$())) {
+      this.formControl$().reset(obj, {onlySelf: true});
     } else {
-      this.formControl.patchValue(obj, {onlySelf: true});
+      this.formControl$().patchValue(obj, {onlySelf: true});
     }
     if (this._valueChange$.observed) {
       this._valueChange$.next(obj);
@@ -218,8 +264,8 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
 
   public setDisabledState(isDisabled: boolean): void {
-    this._isDisabled = isDisabled;
-    isDisabled ? this.formControl.disable({emitEvent: false, onlySelf: true}) : this.formControl.enable({emitEvent: false, onlySelf: true});
+    this._isDisabled$.set(isDisabled);
+    isDisabled ? this.formControl$().disable({emitEvent: false, onlySelf: true}) : this.formControl$().enable({emitEvent: false, onlySelf: true});
     if (this._disabledStateChange$.observed) {
       this._disabledStateChange$.next(isDisabled);
     }
@@ -251,25 +297,25 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
       return this.vFormField(control);
     }
 
-    if (control.errors === null && this.formControl.errors === null) {
+    if (control.errors === null && this.formControl$().errors === null) {
       this.cdr.markForCheck();
       return null;
     }
 
     this.cdr.markForCheck();
-    return this.formControl.errors;
+    return this.formControl$().errors;
   }
 
   private checkRequired(control: AbstractControl<T>): void {
-    this._fieldRequired = control.hasValidator(Validators.required)
+    this._fieldRequired$.set(control.hasValidator(Validators.required)
       || control.hasValidator(Validators.requiredTrue)
-      || !!this.config.requiredValidators?.some(validator => control.hasValidator(validator));
+      || !!this.config.requiredValidators?.some(validator => control.hasValidator(validator)));
   }
 
   private setInitial(control: AbstractControl<T>): void {
-    if (!this._formControlName) {
-      this._formControlName = getControlName(control);
-      this._baseFormControl = control;
+    if (!this.formControlName$()) {
+      this._formControlName$.set(getControlName(control));
+      this._baseFormControl$.set(control);
       this._baseFormControlReady$.next(control);
       setTimeout(() => {
         control.statusChanges
@@ -277,14 +323,14 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
             startWith(control.status),
             tap(() => {
               let allErrors: ValidationErrors | null = control.errors;
-              const localControlErrors: ValidationErrors | null = this.formControl.errors;
+              const localControlErrors: ValidationErrors | null = this.formControl$().errors;
               if (localControlErrors) {
                 allErrors = {...allErrors, ...localControlErrors};
               }
-              this.formControl.setErrors(allErrors, {emitEvent: false});
-              const errors: ValidationErrors | null = this.formControl.errors;
-              if (this.formControl.pristine && this.formControl.untouched && errors && this.enableTouchOnInitialError()(this.formControl, this.formControlName)) {
-                this.formControl.markAsTouched({onlySelf: true});
+              this.formControl$().setErrors(allErrors, {emitEvent: false});
+              const errors: ValidationErrors | null = this.formControl$().errors;
+              if (this.formControl$().pristine && this.formControl$().untouched && errors && this.enableTouchOnInitialError()(this.formControl$(), this.formControlName$())) {
+                this.formControl$().markAsTouched({onlySelf: true});
               }
               this.cdr.markForCheck();
             }),
@@ -295,30 +341,32 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   }
 
   private checkDirty(control: AbstractControl<T>): void {
-    if (this.formControl.dirty && control.pristine) {
+    if (this.formControl$().dirty && control.pristine) {
       control.markAsDirty();
     }
   }
 
   private checkPristine(control: AbstractControl<T>): void {
-    if (this.formControl.pristine && control.dirty) {
+    if (this.formControl$().pristine && control.dirty) {
       control.markAsPristine();
     }
   }
 
   private checkTouched(control: AbstractControl<T>): void {
-    if (this.formControl.untouched && control.touched) {
-      this.formControl.markAsTouched({onlySelf: true});
+    if (this.formControl$().untouched && control.touched) {
+      this.formControl$().markAsTouched({onlySelf: true});
     }
   }
 
   private setValidate(control: AbstractControl<T>): void {
+    const validation: FormFieldValidation<T> = {
+      control: this.formControl$(),
+      baseControl: control,
+      controlName: this.formControlName$()
+    };
+    this._validation$.set(validation);
     if (this._validate$.observed) {
-      this._validate$.next({
-        control: this.formControl,
-        baseControl: control,
-        controlName: this.formControlName
-      });
+      this._validate$.next(validation);
     }
   }
 }
