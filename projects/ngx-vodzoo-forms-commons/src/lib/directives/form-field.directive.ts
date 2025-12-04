@@ -220,6 +220,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
     this._onChange = fn;
     this.formControl$().valueChanges
       .pipe(
+        tap(v => this._value$.set(v)),
         tap(() => {
           if (this._skip) {
             return;
@@ -247,7 +248,6 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
 
   public writeValue(obj: T): void {
-    this._value$.set(obj);
     if (this._changeRegistered) {
       this._skip = true;
     }
