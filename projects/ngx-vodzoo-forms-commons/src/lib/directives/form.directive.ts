@@ -6,7 +6,6 @@ import {
   effect,
   EffectRef,
   ElementRef,
-  EventEmitter,
   HostBinding,
   inject,
   InjectionToken,
@@ -166,6 +165,8 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   }
 
   public showErrors: InputSignal<ShowErrors<T> | undefined> = input(); // mark all form controls as touched
+  public storageSaveOn: InputSignal<StorageSaveOn[] | undefined> = input(); // overrides service storageSaveOn
+  public parserFn: InputSignal<((text: string) => any) | undefined> = input(); // overrides service parserFn
 
 
   /**
@@ -339,7 +340,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
           resetUiChange(this.form$());
         }),
         filter(() => dataChanged || rawDataChanged),
-        tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId$(), this.saveInStorage, storageSaveOn) : null),
+        tap(value => this.saveDataWithService ? this.formService.setFormValues(value[1], this.componentId$(), this.saveInStorage, storageSaveOn, this.storageSaveOn()) : null),
         map<[FormValues<T, UserTypes>, FormValues<T, UserTypes>], ValueChanges<T, UserTypes>>(value => ({
           uiChange,
           dataChanged,

@@ -128,14 +128,14 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     }
   }
 
-  public getFormValues(componentId: string = this.defaultComponentId): FormValues<T, UserTypes> | undefined {
+  public getFormValues(componentId: string = this.defaultComponentId, parserFn: (text: string) => any = this.formServiceConfig.parserFn): FormValues<T, UserTypes> | undefined {
     const valuesFromMap: FormValues<T, UserTypes> | undefined = this.formValues.get(componentId);
     if (valuesFromMap) {
       return valuesFromMap;
     }
 
     const storageString: string | null = this.storage.getItem(componentId);
-    const valuesFromStorage: FormValues<T, UserTypes> | undefined = storageString ? this.formServiceConfig.parserFn(storageString) : undefined;
+    const valuesFromStorage: FormValues<T, UserTypes> | undefined = storageString ? parserFn(storageString) : undefined;
     if (valuesFromStorage) {
       this.setFormValues(valuesFromStorage, componentId, false);
     }
@@ -162,14 +162,14 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
                        componentId: string = this.defaultComponentId,
                        saveInStorage: boolean = this.saveInStorage,
                        storageSaveAs: ReadonlyArray<StorageSaveOn> = this.formServiceConfig.storageSaveOn,
+                       serviceStorageSaveOn: ReadonlyArray<StorageSaveOn> = this.formServiceConfig.storageSaveOn,
                        emitEvent: boolean = true): void {
     this.formValues.set(componentId, formValues);
     if (emitEvent) {
       this.formValuesChanges$.next(this.formValues);
     }
     if (saveInStorage) {
-      const configStorageSaveOn: ReadonlyArray<StorageSaveOn> = this.formServiceConfig.storageSaveOn;
-      if (configStorageSaveOn.some(configSave => storageSaveAs.includes(configSave))) {
+      if (serviceStorageSaveOn.some(configSave => storageSaveAs.includes(configSave))) {
         this.storage.setItem(componentId, JSON.stringify(formValues));
       }
     }
