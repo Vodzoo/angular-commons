@@ -104,7 +104,10 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
   public ngOnDestroy(): void {
     if (this.removeFromStorageOnDestroy) {
-      [...this.formValues.keys()].forEach(key => this.storage.removeItem(key));
+      [...this.formValues.keys()].forEach(key => {
+        this.storage.removeItem(key);
+        this.storage.removeItem(`${key}_beforeUserChange`);
+      });
     }
     this.recalculateMethods.length = 0;
   }
@@ -120,7 +123,10 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
   public clearData(opts?: ClearDataOptions): void {
     if (!opts?.skipStorage) {
-      [...this.formValues.keys()].forEach(key => this.storage.removeItem(key));
+      [...this.formValues.keys()].forEach(key => {
+        this.storage.removeItem(key);
+        this.storage.removeItem(`${key}_beforeUserChange`);
+      });
     }
     if (!opts?.skipService) {
       this.formValues.clear();
