@@ -1,4 +1,4 @@
-import {computed, Directive, effect, EffectRef, inject, InjectionToken, output, Signal} from '@angular/core';
+import {computed, Directive, effect, EffectRef, inject, InjectionToken, input, output, Signal} from '@angular/core';
 import {FORM_SERVICE_CONFIG, FormService, FormServiceConfig, STORAGE} from "../services/form.service";
 import {FormDirective, FormRawValue, ValueChanges} from "./form.directive";
 import {AbstractControl} from "@angular/forms";
@@ -8,7 +8,7 @@ import {filter, map, of} from "rxjs";
 
 
 export const DEFAULT_FORM_MODIFIED_CONFIG: FormModifiedConfig = {
-  equalFn: (a, b) => JSON.stringify(a) !== JSON.stringify(b),
+  equalFn: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 } as const;
 
 export const FORM_MODIFIED_CONFIG: InjectionToken<FormModifiedConfig> = new InjectionToken<FormModifiedConfig>('FORM_MODIFIED_CONFIG', {
@@ -16,8 +16,10 @@ export const FORM_MODIFIED_CONFIG: InjectionToken<FormModifiedConfig> = new Inje
 });
 
 export interface FormModifiedConfig {
-  equalFn: (a: any, b: any, service: FormService<any, any, any>) => boolean;
+  equalFn: FormModifiedEqualFn;
 }
+
+export type FormModifiedEqualFn = (a: any, b: any, service: FormService<any, any, any>) => boolean;
 
 @Directive({
   selector: '[vFormModified]',
@@ -32,7 +34,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   private readonly formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
   private readonly storage: Storage = inject(STORAGE);
   private readonly formServiceConfig: FormServiceConfig = inject(FORM_SERVICE_CONFIG);
-  private readonly formChangedConfig: FormModifiedConfig = inject(FORM_MODIFIED_CONFIG);
+  private readonly formModifiedConfig: FormModifiedConfig = inject(FORM_MODIFIED_CONFIG);
 
   /**
    * Fields
@@ -43,8 +45,14 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   /**
    * Computed
    */
+  private readonly equalFn = computed(() => this.formModifiedEqualFn() ?? this.formModifiedConfig.equalFn);
   private readonly valueChanges = computed(() => getFormValueChanges$(this.formDirective.form$())());
   private readonly storageValue = computed(() => this.storageData ? this.formServiceConfig.parserFn(this.storageData) as FormRawValue<T> : undefined);
+
+  /**
+   * Inputs
+   */
+  public readonly formModifiedEqualFn = input<FormModifiedEqualFn | undefined>(undefined);
 
   /**
    * Outputs
@@ -90,7 +98,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
         valueBeforeChange,
       }
     }),
-    computation: ({ methodParams }) => !this.formChangedConfig.equalFn(methodParams.valueChanges.current.rawValue, methodParams.valueBeforeChange, this.formService)
+    computation: ({ methodParams }) => !this.equalFn()(methodParams.valueChanges.current.rawValue, methodParams.valueBeforeChange, this.formService)
   });
 
   private readonly emitModification: Signal<void | undefined> = methodSignal({
