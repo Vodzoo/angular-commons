@@ -37,17 +37,16 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   private readonly formModifiedConfig: FormModifiedConfig = inject(FORM_MODIFIED_CONFIG);
 
   /**
-   * Fields
-   */
-  private readonly storageKey = `${this.formDirective.componentId}_beforeUserChange`;
-  private readonly storageData = this.storage.getItem(this.storageKey);
-
-  /**
    * Computed
    */
+  private readonly storageKey = computed(() => `${this.formDirective.componentId$()}_beforeUserChange`);
+  private readonly storageData = computed(() => this.storage.getItem(this.storageKey()));
   private readonly equalFn = computed(() => this.formModifiedEqualFn() ?? this.formModifiedConfig.equalFn);
   private readonly valueChanges = computed(() => getFormValueChanges$(this.formDirective.form$())());
-  private readonly storageValue = computed(() => this.storageData ? this.formServiceConfig.parserFn(this.storageData) as FormRawValue<T> : undefined);
+  private readonly storageValue = computed(() => {
+    const data: string | null = this.storageData();
+    return data ? this.formServiceConfig.parserFn(data) as FormRawValue<T> : undefined
+  });
 
   /**
    * Inputs
@@ -114,7 +113,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
     if (!state) {
       return;
     }
-    this.storage.setItem(this.storageKey, JSON.stringify(state));
+    this.storage.setItem(this.storageKey(), JSON.stringify(state));
     // storage is cleared on destroy in form.service
   });
 }
