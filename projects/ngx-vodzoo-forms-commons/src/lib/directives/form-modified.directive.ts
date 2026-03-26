@@ -1,11 +1,39 @@
 import {computed, Directive, effect, EffectRef, inject, InjectionToken, input, output, Signal} from '@angular/core';
-import {FORM_SERVICE_CONFIG, FormService, FormServiceConfig, STORAGE} from "../services/form.service";
+import {FORM_SERVICE_CONFIG, FormServiceConfig, STORAGE} from "../services/form.service";
 import {FormDirective, FormRawValue, ValueChanges} from "./form.directive";
 import {AbstractControl} from "@angular/forms";
 import {getFormValueChanges$} from "../formValues";
 import {methodSignal} from "../signals/method-signal";
 import {filter, map, of} from "rxjs";
 
+export interface FormModifiedConfig {
+  equalFn: FormModifiedEqualFn;
+  valueSelectorFn?: ValueSelectorFn;
+}
+
+export type FormModifiedEqualFn = (a: any, b: any, path: (string | number)[]) => boolean;
+export type ValueSelectorFn = (value: any, path: (string | number)[]) => any;
+
+export interface FormValueModified {
+  modified: boolean;
+  diffs: FormModifiedDiffEntry[];
+}
+
+
+export interface FormModifiedDiffEntry {
+  path: (string | number)[];
+  pathString: string;
+  previousValue: any;
+  currentValue: any;
+}
+
+export interface GetDiffParams {
+  previous: any;
+  current: any;
+  equalFn: FormModifiedEqualFn;
+  valueSelectorFn?: ValueSelectorFn;
+  path?: (string | number)[];
+}
 
 export const DEFAULT_FORM_MODIFIED_CONFIG: FormModifiedConfig = {
   equalFn: (a, b) => JSON.stringify(a) === JSON.stringify(b),
@@ -14,12 +42,6 @@ export const DEFAULT_FORM_MODIFIED_CONFIG: FormModifiedConfig = {
 export const FORM_MODIFIED_CONFIG: InjectionToken<FormModifiedConfig> = new InjectionToken<FormModifiedConfig>('FORM_MODIFIED_CONFIG', {
   factory: () => DEFAULT_FORM_MODIFIED_CONFIG
 });
-
-export interface FormModifiedConfig {
-  equalFn: FormModifiedEqualFn;
-}
-
-export type FormModifiedEqualFn = (a: any, b: any, service: FormService<any, any, any>) => boolean;
 
 @Directive({
   selector: '[vFormModified]',
@@ -30,7 +52,6 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   /**
    * Provider tokens
    */
-  private readonly formService: FormService<T, UserConfig, UserTypes> = inject(FormService<T, UserConfig, UserTypes>);
   private readonly formDirective: FormDirective<T, UserConfig, UserTypes> = inject(FormDirective<T, UserConfig, UserTypes>);
   private readonly storage: Storage = inject(STORAGE);
   private readonly formServiceConfig: FormServiceConfig = inject(FORM_SERVICE_CONFIG);
@@ -42,6 +63,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   private readonly storageKey = computed(() => `${this.formDirective.componentId$()}_beforeUserChange`);
   private readonly storageData = computed(() => this.storage.getItem(this.storageKey()));
   private readonly equalFn = computed(() => this.formModifiedEqualFn() ?? this.formModifiedConfig.equalFn);
+  private readonly valueSelectorFn = computed(() => this.formModifiedValueSelectorFn() ?? this.formModifiedConfig.valueSelectorFn);
   private readonly valueChanges = computed(() => getFormValueChanges$(this.formDirective.form$())());
   private readonly storageValue = computed(() => {
     const data: string | null = this.storageData();
@@ -52,6 +74,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
    * Inputs
    */
   public readonly formModifiedEqualFn = input<FormModifiedEqualFn | undefined>(undefined);
+  public readonly formModifiedValueSelectorFn = input<ValueSelectorFn | undefined>(undefined);
 
   /**
    * Outputs
@@ -85,25 +108,38 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
     }
   });
 
-  private readonly isModified: Signal<boolean | undefined> = methodSignal({
+  private readonly formDiffs: Signal<FormModifiedDiffEntry[] | undefined> = methodSignal({
     params: computed(() => {
       const valueChanges = this.valueChanges();
       const valueBeforeChange = this.valueBeforeChange();
+      const equalFn = this.equalFn();
+      const valueSelectorFn = this.valueSelectorFn();
       if (!valueChanges || !valueBeforeChange) {
         return undefined;
       }
       return {
-        valueChanges,
-        valueBeforeChange,
+        current: valueChanges.current.rawValue,
+        previous: valueBeforeChange,
+        equalFn,
+        valueSelectorFn,
       }
     }),
-    computation: ({ methodParams }) => !this.equalFn()(methodParams.valueChanges.current.rawValue, methodParams.valueBeforeChange, this.formService)
+    computation: ({ methodParams }) => {
+      const { current, previous, equalFn } = methodParams;
+      return getDiff(
+        {
+          previous,
+          current,
+          equalFn,
+          valueSelectorFn: methodParams.valueSelectorFn,
+        }
+      );
+    }
   });
 
   private readonly emitModification: Signal<void | undefined> = methodSignal({
-    params: this.isModified,
-    computation: ({ methodParams: modified }) => this.formValueModified.emit({modified})
-  });
+    params: this.formDiffs,
+    computation: ({ methodParams: diffs }) => this.formValueModified.emit({modified: !!diffs.length, diffs})});
 
   /**
    * Effects
@@ -118,7 +154,59 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   });
 }
 
+export function getDiff({
+                          previous,
+                          current,
+                          equalFn,
+                          valueSelectorFn,
+                          path = []
+                        }: GetDiffParams): FormModifiedDiffEntry[] {
 
-export interface FormValueModified {
-  modified: boolean;
+  const changes: FormModifiedDiffEntry[] = [];
+
+  const left = valueSelectorFn ? valueSelectorFn(previous, path) : previous;
+  const right = valueSelectorFn ? valueSelectorFn(current, path) : current;
+
+  const isObject = (v: any) => v !== null && typeof v === 'object';
+
+  const bothObjects = isObject(left) && isObject(right);
+
+  if (!bothObjects) {
+    if (!equalFn(left, right, path)) {
+      changes.push({
+        path,
+        pathString: path.join('.'),
+        previousValue: previous,
+        currentValue: current
+      });
+    }
+    return changes;
+  }
+
+  if (equalFn(left, right, path)) {
+    return [];
+  }
+
+  const keys = new Set([
+    ...Object.keys(previous ?? {}),
+    ...Object.keys(current ?? {})
+  ]);
+
+  for (const key of keys) {
+    const nextPath = Array.isArray(current)
+      ? [...path, Number(key)]
+      : [...path, key];
+
+    changes.push(
+      ...getDiff({
+        previous: previous?.[key],
+        current: current?.[key],
+        equalFn,
+        valueSelectorFn,
+        path: nextPath
+      })
+    );
+  }
+
+  return changes;
 }
