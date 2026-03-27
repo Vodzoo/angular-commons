@@ -5,6 +5,7 @@ import {AbstractControl} from "@angular/forms";
 import {getFormValueChanges$} from "../formValues";
 import {methodSignal} from "../signals/method-signal";
 import {filter, map, of} from "rxjs";
+import {setFormModified} from "../formModified";
 
 export interface FormModifiedConfig {
   equalFn: FormModifiedEqualFn;
@@ -139,7 +140,15 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
 
   private readonly emitModification: Signal<void | undefined> = methodSignal({
     params: this.formDiffs,
-    computation: ({ methodParams: diffs }) => this.formValueModified.emit({modified: !!diffs.length, diffs})});
+    computation: ({ methodParams: diffs }) => {
+      const modifications: FormValueModified = {
+        modified: !!diffs.length,
+        diffs
+      };
+      this.formValueModified.emit(modifications);
+      setFormModified(this.formDirective.form$(), modifications);
+    }
+  });
 
   /**
    * Effects
