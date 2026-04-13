@@ -26,6 +26,8 @@ export function mergeDeep(target: any, source: any, opts?: { mergeArrays?: boole
 
     if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
       target[key] = opts?.mergeArrays ? [...targetValue, ...sourceValue] : sourceValue;
+    }  else if (targetValue instanceof Map && sourceValue instanceof Map) {
+      target[key] = new Map([...targetValue, ...sourceValue]);
     } else if (isObject(targetValue) && isObject(sourceValue)) {
       target[key] = mergeDeep(targetValue, sourceValue, opts);
     } else {
