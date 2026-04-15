@@ -60,7 +60,7 @@ export function removeValidators(context: string, control: AbstractControl, vali
     return;
   }
   control.removeValidators(validatorsToRemove);
-  control.updateValueAndValidity(opts);
+  control.setValue(control.value, { onlySelf: true, emitEvent: false }); // workaround - control.updateValueAndValidity(opts); doesn't update error object
 }
 
 export function getValidatorContexts(control: AbstractControl, validator: ValidatorFn): string[] {
