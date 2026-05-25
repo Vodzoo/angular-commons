@@ -315,6 +315,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
   private setInitial(control: AbstractControl<T>): void {
     if (!this.formControlName$()) {
       this._formControlName$.set(getControlName(control));
+      this._value$.set(control.value);
       this._baseFormControl$.set(control);
       this._baseFormControlReady$.next(control);
       setTimeout(() => {
