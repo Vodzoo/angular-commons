@@ -230,21 +230,45 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     if (!showErrors) {
       return;
     }
+    for (const signalToCheck of showErrors.checkOn ?? []) {
+      signalToCheck();
+    }
     const conditionFn: ShowErrorsConditionFn<T> | undefined = showErrors.withCondition;
-    const value: boolean | undefined = showErrors.withValue;
+    const value: boolean | ShowErrorsWithCustomAbstractControls | undefined = showErrors.withValue;
     if (conditionFn) {
       const markAsTouched: Subscription = merge(this.form$().valueChanges, this.form$().statusChanges.pipe(startWith(this.form$().status)))
         .pipe(
           debounceTime(0),
-          filter(() => conditionFn({form: this.form$()})),
-          tap(() => markAllAsTouched(this.form$())),
+          map(() => conditionFn({form: this.form$(), formIndex: this.formIndex$()})),
+          filter((conditionValue) => {
+            if (typeof conditionValue === 'boolean') {
+              return conditionValue;
+            }
+            return conditionValue.show;
+          }),
+          tap((conditionValue) => {
+            if (typeof conditionValue === 'boolean') {
+              markAllAsTouched(this.form$());
+            } else {
+              conditionValue.applyTo.forEach(markAllAsTouched);
+            }
+          }),
         ).subscribe();
       onCleanup(() => {
         markAsTouched.unsubscribe();
       });
     }
+
     if (value === true) {
       markAllAsTouched(this.form$());
+    }
+    if (value === undefined || value === false) {
+      return;
+    }
+
+    const objectValue = value as ShowErrorsWithCustomAbstractControls;
+    if (objectValue.show) {
+      objectValue.applyTo.forEach(markAllAsTouched);
     }
   });
 
@@ -537,7 +561,7 @@ type RecursivePartialValidators<T, UserTypes> = {
 type ArrayValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueValidatorFn : RecursivePartialValidators<T, UserTypes>;
 type ValueValidator<T, UserTypes> = T extends AllowedTypes<UserTypes> ? ValueValidatorFn : RecursivePartialValidators<T, UserTypes>;
 export type ValueValidatorFn = (index?: number | null) => ValidatorFunctions;
-export type ShowErrorsConditionFn<T extends { [K in keyof T]: AbstractControl }> = (data: ShowErrorsConditionFnData<T>) => boolean;
+export type ShowErrorsConditionFn<T extends { [K in keyof T]: AbstractControl }> = (data: ShowErrorsConditionFnData<T>) => boolean | ShowErrorsWithCustomAbstractControls;
 
 
 /**
@@ -560,11 +584,18 @@ export interface StatusChanges {
 }
 
 export interface ShowErrors<T extends { [K in keyof T]: AbstractControl }> {
-  withCondition?: ShowErrorsConditionFn<T>; // shows errors when this function returns true - fn is fired on form value and status change
-  withValue?: boolean; // shows errors when this value = true
+  withCondition?: ShowErrorsConditionFn<T>; // shows errors when this function returns true or {show: true} - fn is fired on form value change and status change
+  withValue?: boolean | ShowErrorsWithCustomAbstractControls; // shows errors when withValue = true or withValue.show = true
+  checkOn?: Signal<unknown>[]; // additional signals to react to while checking withCondition or withValue
 }
 export interface ShowErrorsConditionFnData<T extends { [K in keyof T]: AbstractControl }> {
   form: FormGroup<T>;
+  formIndex?: number;
+}
+
+export interface ShowErrorsWithCustomAbstractControls {
+  show: boolean;
+  applyTo: AbstractControl[];
 }
 
 

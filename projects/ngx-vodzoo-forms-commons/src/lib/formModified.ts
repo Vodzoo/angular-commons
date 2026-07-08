@@ -2,6 +2,14 @@ import { AbstractControl, FormGroup } from "@angular/forms";
 import { isSignal, Signal, signal, WritableSignal } from "@angular/core";
 import { FormValueModified } from "./directives/form-modified.directive";
 
+/**
+ *     Add in form host directives section:
+ *     {
+ *       directive: FormModifiedDirective,
+ *       outputs: ['formValueModified'], // this is optional - same data exposed as output
+ *     },
+ */
+
 export function setFormModified<T extends { [K in keyof T]: AbstractControl<any, any>; }>(formGroup: FormGroup<T>, modifications: FormValueModified): void {
   ensureSignal(formGroup, formModified).set(modifications);
 }
