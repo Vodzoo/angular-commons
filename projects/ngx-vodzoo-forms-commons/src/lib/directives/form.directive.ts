@@ -29,7 +29,7 @@ import {
   FormGroup,
   ValidatorFn
 } from "@angular/forms";
-import {FormService, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
+import {FormService, getFormComponentId, StorageSaveOn, ValidatorFunctions} from "../services/form.service";
 import {
   BehaviorSubject,
   debounceTime,
@@ -110,11 +110,9 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private readonly _form$: WritableSignal<FormGroup<T>> = signal(this.formService.getFormGroup());
   public readonly form$: Signal<FormGroup<T>> = this._form$.asReadonly();
   private readonly _elementLocalName$: Signal<string> = signal(this.elementRef.nativeElement.localName).asReadonly();
-  public readonly componentId$: Signal<string> = computed(() => {
-    const index = this.formIndex$();
-    const formIndex: string = index || index === 0 ? `_${index}` : '';
-    return `${this._elementLocalName$()}${formIndex}`;
-  });
+  public readonly componentId$: Signal<string> = computed(() =>
+    getFormComponentId(this._elementLocalName$(), this.formIndex$())
+  );
   private readonly _invalidFields$: WritableSignal<string[]> = signal([]);
   public readonly invalidFields$: Signal<string[]> = this._invalidFields$.asReadonly();
   private readonly _statusChanges$: WritableSignal<FormControlStatus | undefined> = signal(undefined);
@@ -201,9 +199,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * ------------------------------------
    */
   public get componentId(): string {
-    const index = this.formIndex$();
-    const formIndex: string = index || index === 0 ? `_${index}` : '';
-    return `${this._elementLocalName$()}${formIndex}`
+    return this.componentId$();
   }
 
 
