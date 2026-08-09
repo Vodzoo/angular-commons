@@ -282,6 +282,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
    * @param control
    */
   public validate(control: AbstractControl<T>): ValidationErrors | null {
+    this.formControl$().updateValueAndValidity({emitEvent: false, onlySelf: true});
     this.setInitial(control);
     this.checkRequired(control);
     this.checkDirty(control)

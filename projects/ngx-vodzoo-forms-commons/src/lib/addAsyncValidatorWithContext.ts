@@ -1,120 +1,181 @@
-import { AbstractControl, AsyncValidatorFn } from "@angular/forms";
-import {ControlOptions} from "./disableWithContext";
+import {AbstractControl, AsyncValidatorFn} from '@angular/forms';
+import {ControlOptions} from './disableWithContext';
 
-export function switchAsyncValidators(condition: () => boolean, context: string, control: AbstractControl, asyncValidators: AsyncValidatorFn[], opts?: ControlOptions): void {
-  condition() ? addAsyncValidators(context, control, asyncValidators, opts) : removeAsyncValidators(context, control, asyncValidators, opts);
+export function switchAsyncValidators(
+  condition: () => boolean,
+  context: string,
+  control: AbstractControl,
+  asyncValidators: AsyncValidatorFn[],
+  opts?: ControlOptions
+): void {
+  condition()
+    ? addAsyncValidators(context, control, asyncValidators, opts)
+    : removeAsyncValidators(context, control, asyncValidators, opts);
 }
 
-export function addAsyncValidators(context: string, control: AbstractControl, asyncValidators: AsyncValidatorFn[], opts?: Omit<ControlOptions, 'force'>): void {
-  const allContextsValidators: AsyncValidatorFn[] = getAllContextsAsyncValidators(control);
-  const asyncValidatorsToAdd: AsyncValidatorFn[] = [];
-  asyncValidators.forEach(asyncValidator => {
-    if (!control.hasAsyncValidator(asyncValidator)) {
-      asyncValidatorsToAdd.push(asyncValidator);
-    } else if (!allContextsValidators.includes(asyncValidator)) {
-      addExistingAsyncValidator(control, asyncValidator);
-    }
-  })
+export function addAsyncValidators(
+  context: string,
+  control: AbstractControl,
+  asyncValidators: AsyncValidatorFn[],
+  opts?: Omit<ControlOptions, 'force'>
+): void {
+  const state = getState(control);
+  const validatorsToAdd = [...new Set(asyncValidators)];
 
-  setContext(control, asyncValidators, context);
-  if (asyncValidatorsToAdd.length === 0) {
+  captureInitialAsyncValidators(
+    control,
+    state,
+    validatorsToAdd
+  );
+
+  const contextValidators =
+    state.contexts.get(context) ?? new Set<AsyncValidatorFn>();
+
+  validatorsToAdd.forEach(
+    validator => contextValidators.add(validator)
+  );
+
+  state.contexts.set(context, contextValidators);
+
+  const missingValidators = validatorsToAdd.filter(
+    validator => !control.hasAsyncValidator(validator)
+  );
+
+  if (missingValidators.length === 0) {
     return;
   }
-  control.addAsyncValidators(asyncValidators);
+
+  control.addAsyncValidators(missingValidators);
   control.updateValueAndValidity(opts);
 }
 
-export function removeAsyncValidators(context: string, control: AbstractControl, asyncValidators?: AsyncValidatorFn[], opts?: ControlOptions): void {
-  const contexts: AddAsyncValidatorsContexts | undefined = getContexts(control);
-  const contextValidators: AsyncValidatorFn[] = contexts?.get(context) ?? [];
-  let asyncValidatorsToRemove: AsyncValidatorFn[] = asyncValidators ?? contextValidators;
+export function removeAsyncValidators(
+  context: string,
+  control: AbstractControl,
+  asyncValidators?: AsyncValidatorFn[],
+  opts?: ControlOptions
+): void {
+  const state = getState(control);
+  const contextValidators = state.contexts.get(context);
 
-  if (asyncValidatorsToRemove.length === 0) {
+  const validatorsToDetach = new Set(
+    asyncValidators ?? contextValidators ?? []
+  );
+
+  if (validatorsToDetach.size === 0) {
     return;
   }
 
-  if (!contexts) {
-    asyncValidatorsToRemove.forEach(asyncValidator => {
-      if (control.hasAsyncValidator(asyncValidator)) {
-        addExistingAsyncValidator(control, asyncValidator);
-      }
-    });
-  }
+  captureInitialAsyncValidators(
+    control,
+    state,
+    validatorsToDetach
+  );
 
-  asyncValidatorsToRemove.forEach(asyncValidatorToRemove => {
-    if (!control.hasAsyncValidator(asyncValidatorToRemove)) {
-      removeExistingAsyncValidator(control, asyncValidatorToRemove);
+  if (contextValidators) {
+    validatorsToDetach.forEach(
+      validator => contextValidators.delete(validator)
+    );
+
+    if (contextValidators.size === 0) {
+      state.contexts.delete(context);
     }
-  });
-
-  if (!opts?.force) {
-    asyncValidatorsToRemove = asyncValidatorsToRemove.filter(asyncValidatorToRemove => !getExistingAsyncValidators(control)?.has(asyncValidatorToRemove));
   }
-  if (contexts) {
-    asyncValidatorsToRemove = asyncValidatorsToRemove.filter(asyncValidatorToRemove => contextValidators.includes(asyncValidatorToRemove));
-  }
-  setContext(control, contextValidators.filter(contextValidator => !asyncValidatorsToRemove.includes(contextValidator)), context);
 
-  asyncValidatorsToRemove = asyncValidatorsToRemove.filter(asyncValidatorToRemove => control.hasAsyncValidator(asyncValidatorToRemove));
-  if (asyncValidatorsToRemove.length === 0) {
+  if (opts?.force) {
+    validatorsToDetach.forEach(
+      validator => state.initialValidators.delete(validator)
+    );
+  }
+
+  const validatorsToRemove = [...validatorsToDetach].filter(
+    validator =>
+      control.hasAsyncValidator(validator) &&
+      !state.initialValidators.has(validator) &&
+      !isUsedByAnyContext(state, validator)
+  );
+
+  if (validatorsToRemove.length === 0) {
     return;
   }
-  control.removeAsyncValidators(asyncValidatorsToRemove);
+
+  control.removeAsyncValidators(validatorsToRemove);
   control.updateValueAndValidity(opts);
 }
 
-export function getAsyncValidatorContexts(control: AbstractControl, asyncValidator: AsyncValidatorFn): string[] {
-  const contexts: AddAsyncValidatorsContexts | undefined = getContexts(control);
-  if (!contexts) {
+export function getAsyncValidatorContexts(
+  control: AbstractControl,
+  asyncValidator: AsyncValidatorFn
+): string[] {
+  const state = getExistingState(control);
+
+  if (!state) {
     return [];
   }
-  return [...contexts.entries()].filter(entry => entry[1].includes(asyncValidator)).map(entry => entry[0]);
+
+  return [...state.contexts.entries()]
+    .filter(([, validators]) => validators.has(asyncValidator))
+    .map(([context]) => context);
 }
 
-function getContexts(control: AbstractControl): AddAsyncValidatorsContexts | undefined {
-  return (control as AbstractControlWithContexts)[addAsyncValidatorsContext];
-}
-
-function getExistingAsyncValidators(control: AbstractControl): ExistingAsyncValidators | undefined {
-  return (control as AbstractControlWithExistingAsyncValidators)[existingAsyncValidators];
-}
-
-function addExistingAsyncValidator(control: AbstractControl, asyncValidator: AsyncValidatorFn): void {
-  const existingAsyncValidators: ExistingAsyncValidators | undefined = getExistingAsyncValidators(control) ?? new Set<AsyncValidatorFn>();
-  existingAsyncValidators.add(asyncValidator);
-  setExistingAsyncValidators(control, existingAsyncValidators);
-}
-
-function removeExistingAsyncValidator(control: AbstractControl, asyncValidator: AsyncValidatorFn): void {
-  const existingAsyncValidators: ExistingAsyncValidators | undefined = getExistingAsyncValidators(control);
-  if (!existingAsyncValidators) {
-    return;
+function captureInitialAsyncValidators(
+  control: AbstractControl,
+  state: AsyncValidatorsState,
+  validators: Iterable<AsyncValidatorFn>
+): void {
+  for (const validator of validators) {
+    if (
+      control.hasAsyncValidator(validator) &&
+      !state.initialValidators.has(validator) &&
+      !isUsedByAnyContext(state, validator)
+    ) {
+      state.initialValidators.add(validator);
+    }
   }
-  existingAsyncValidators.delete(asyncValidator);
 }
 
-function getAllContextsAsyncValidators(control: AbstractControl): AsyncValidatorFn[] {
-  const context: AddAsyncValidatorsContexts | undefined = getContexts(control);
-  if (!context) {
-    return [];
+function isUsedByAnyContext(
+  state: AsyncValidatorsState,
+  validator: AsyncValidatorFn
+): boolean {
+  return [...state.contexts.values()]
+    .some(validators => validators.has(validator));
+}
+
+function getExistingState(
+  control: AbstractControl
+): AsyncValidatorsState | undefined {
+  return (control as AbstractControlWithAsyncValidatorsState)[asyncValidatorsState];
+}
+
+function getState(
+  control: AbstractControl
+): AsyncValidatorsState {
+  let state = getExistingState(control);
+
+  if (!state) {
+    state = {
+      contexts: new Map(),
+      initialValidators: new Set()
+    };
+
+    (control as AbstractControlWithAsyncValidatorsState)[asyncValidatorsState] = state;
   }
-  return [...context.values()].flat();
+
+  return state;
 }
 
-function setContext(control: AbstractControl, contextValue: AsyncValidatorFn[], context: string): void {
-  const contexts: AddAsyncValidatorsContexts = getContexts(control) ?? new Map();
-  contexts.set(context, contextValue);
-  (control as AbstractControlWithContexts)[addAsyncValidatorsContext] = contexts;
-}
+const asyncValidatorsState: unique symbol = Symbol('asyncValidatorsState');
 
-function setExistingAsyncValidators(control: AbstractControl, asyncValidators: ExistingAsyncValidators): void {
-  (control as AbstractControlWithExistingAsyncValidators)[existingAsyncValidators] = asyncValidators;
-}
+export type AddAsyncValidatorsContexts = Map<string, Set<AsyncValidatorFn>>;
+export type InitialAsyncValidators = Set<AsyncValidatorFn>;
 
-const addAsyncValidatorsContext: unique symbol = Symbol('addAsyncValidatorsContext');
-const existingAsyncValidators: unique symbol = Symbol('existingAsyncValidators');
+type AsyncValidatorsState = {
+  contexts: AddAsyncValidatorsContexts;
+  initialValidators: InitialAsyncValidators;
+};
 
-export type AddAsyncValidatorsContexts = Map<string, AsyncValidatorFn[]>;
-export type ExistingAsyncValidators = Set<AsyncValidatorFn>;
-type AbstractControlWithContexts = AbstractControl & { [addAsyncValidatorsContext]: AddAsyncValidatorsContexts };
-type AbstractControlWithExistingAsyncValidators = AbstractControl & { [existingAsyncValidators]: ExistingAsyncValidators };
+type AbstractControlWithAsyncValidatorsState =
+  AbstractControl & {
+  [asyncValidatorsState]?: AsyncValidatorsState;
+};

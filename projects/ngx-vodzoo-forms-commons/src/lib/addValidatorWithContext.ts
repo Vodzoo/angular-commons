@@ -1,120 +1,184 @@
-import {AbstractControl, ValidatorFn} from "@angular/forms";
-import {ControlOptions} from "./disableWithContext";
+import {AbstractControl, ValidatorFn} from '@angular/forms';
+import {ControlOptions} from './disableWithContext';
 
-export function switchValidators(condition: () => boolean, context: string, control: AbstractControl, validators: ValidatorFn[], opts?: ControlOptions): void {
-  condition() ? addValidators(context, control, validators, opts) : removeValidators(context, control, validators, opts);
+export function switchValidators(
+  condition: () => boolean,
+  context: string,
+  control: AbstractControl,
+  validators: ValidatorFn[],
+  opts?: ControlOptions
+): void {
+  condition()
+    ? addValidators(context, control, validators, opts)
+    : removeValidators(context, control, validators, opts);
 }
 
-export function addValidators(context: string, control: AbstractControl, validators: ValidatorFn[], opts?: Omit<ControlOptions, 'force'>): void {
-  const allContextsValidators: ValidatorFn[] = getAllContextsValidators(control);
-  const validatorsToAdd: ValidatorFn[] = [];
-  validators.forEach(validator => {
-    if (!control.hasValidator(validator)) {
-      validatorsToAdd.push(validator);
-    } else if (!allContextsValidators.includes(validator)) {
-      addExistingValidator(control, validator);
-    }
-  })
+export function addValidators(
+  context: string,
+  control: AbstractControl,
+  validators: ValidatorFn[],
+  opts?: Omit<ControlOptions, 'force'>
+): void {
+  const state = getState(control);
+  const validatorsToAdd = [...new Set(validators)];
 
-  setContext(control, validators, context);
-  if (validatorsToAdd.length === 0) {
+  captureInitialValidators(control, state, validatorsToAdd);
+
+  const contextValidators = state.contexts.get(context) ?? new Set<ValidatorFn>();
+
+  validatorsToAdd.forEach(validator => contextValidators.add(validator));
+  state.contexts.set(context, contextValidators);
+
+  const missingValidators = validatorsToAdd.filter(
+    validator => !control.hasValidator(validator)
+  );
+
+  if (missingValidators.length === 0) {
     return;
   }
-  control.addValidators(validators);
-  control.updateValueAndValidity(opts);
+
+  control.addValidators(missingValidators);
+  updateValueAndValidity(control, opts);
 }
 
-export function removeValidators(context: string, control: AbstractControl, validators?: ValidatorFn[], opts?: ControlOptions): void {
-  const contexts: AddValidatorsContexts | undefined = getContexts(control);
-  const contextValidators: ValidatorFn[] = contexts?.get(context) ?? [];
-  let validatorsToRemove: ValidatorFn[] = validators ?? contextValidators;
+export function removeValidators(
+  context: string,
+  control: AbstractControl,
+  validators?: ValidatorFn[],
+  opts?: ControlOptions
+): void {
+  const state = getState(control);
+  const contextValidators = state.contexts.get(context);
+
+  const validatorsToDetach = new Set(
+    validators ?? contextValidators ?? []
+  );
+
+  if (validatorsToDetach.size === 0) {
+    return;
+  }
+
+  captureInitialValidators(
+    control,
+    state,
+    validatorsToDetach
+  );
+
+  if (contextValidators) {
+    validatorsToDetach.forEach(
+      validator => contextValidators.delete(validator)
+    );
+
+    if (contextValidators.size === 0) {
+      state.contexts.delete(context);
+    }
+  }
+
+  if (opts?.force) {
+    validatorsToDetach.forEach(
+      validator => state.initialValidators.delete(validator)
+    );
+  }
+
+  const validatorsToRemove = [...validatorsToDetach].filter(
+    validator =>
+      control.hasValidator(validator) &&
+      !state.initialValidators.has(validator) &&
+      !isUsedByAnyContext(state, validator)
+  );
 
   if (validatorsToRemove.length === 0) {
     return;
   }
 
-  if (!contexts) {
-    validatorsToRemove.forEach(validator => {
-      if (control.hasValidator(validator)) {
-        addExistingValidator(control, validator);
-      }
-    });
-  }
-
-  validatorsToRemove.forEach(validatorToRemove => {
-    if (!control.hasValidator(validatorToRemove)) {
-      removeExistingValidator(control, validatorToRemove);
-    }
-  });
-
-  if (!opts?.force) {
-    validatorsToRemove = validatorsToRemove.filter(validatorToRemove => !getExistingValidators(control)?.has(validatorToRemove));
-  }
-  if (contexts) {
-    validatorsToRemove = validatorsToRemove.filter(validatorToRemove => contextValidators.includes(validatorToRemove));
-  }
-  setContext(control, contextValidators.filter(contextValidator => !validatorsToRemove.includes(contextValidator)), context);
-
-  validatorsToRemove = validatorsToRemove.filter(validatorToRemove => control.hasValidator(validatorToRemove));
-  if (validatorsToRemove.length === 0) {
-    return;
-  }
   control.removeValidators(validatorsToRemove);
-  control.setValue(control.value, { onlySelf: true, emitEvent: false }); // workaround - control.updateValueAndValidity(opts); doesn't update error object
+  updateValueAndValidity(control, opts);
 }
 
-export function getValidatorContexts(control: AbstractControl, validator: ValidatorFn): string[] {
-  const contexts: AddValidatorsContexts | undefined = getContexts(control);
-  if (!contexts) {
+export function getValidatorContexts(
+  control: AbstractControl,
+  validator: ValidatorFn
+): string[] {
+  const state = getExistingState(control);
+
+  if (!state) {
     return [];
   }
-  return [...contexts.entries()].filter(entry => entry[1].includes(validator)).map(entry => entry[0]);
+
+  return [...state.contexts.entries()]
+    .filter(([, validators]) => validators.has(validator))
+    .map(([context]) => context);
 }
 
-function getContexts(control: AbstractControl): AddValidatorsContexts | undefined {
-  return (control as AbstractControlWithContexts)[addValidatorsContext];
-}
-
-function getExistingValidators(control: AbstractControl): ExistingValidators | undefined {
-  return (control as AbstractControlWithExistingValidators)[existingValidators];
-}
-
-function addExistingValidator(control: AbstractControl, validator: ValidatorFn): void {
-  const existingValidators: ExistingValidators | undefined = getExistingValidators(control) ?? new Set<ValidatorFn>();
-  existingValidators.add(validator);
-  setExistingValidators(control, existingValidators);
-}
-
-function removeExistingValidator(control: AbstractControl, validator: ValidatorFn): void {
-  const existingValidators: ExistingValidators | undefined = getExistingValidators(control);
-  if (!existingValidators) {
-    return;
+function captureInitialValidators(
+  control: AbstractControl,
+  state: ValidatorsState,
+  validators: Iterable<ValidatorFn>
+): void {
+  for (const validator of validators) {
+    if (
+      control.hasValidator(validator) &&
+      !state.initialValidators.has(validator) &&
+      !isUsedByAnyContext(state, validator)
+    ) {
+      state.initialValidators.add(validator);
+    }
   }
-  existingValidators.delete(validator);
 }
 
-function getAllContextsValidators(control: AbstractControl): ValidatorFn[] {
-  const context: AddValidatorsContexts | undefined = getContexts(control);
-  if (!context) {
-    return [];
+function isUsedByAnyContext(
+  state: ValidatorsState,
+  validator: ValidatorFn
+): boolean {
+  return [...state.contexts.values()]
+    .some(validators => validators.has(validator));
+}
+
+function getExistingState(
+  control: AbstractControl
+): ValidatorsState | undefined {
+  return (control as AbstractControlWithValidatorsState)[validatorsState];
+}
+
+function getState(control: AbstractControl): ValidatorsState {
+  let state = getExistingState(control);
+
+  if (!state) {
+    state = {
+      contexts: new Map(),
+      initialValidators: new Set()
+    };
+
+    (control as AbstractControlWithValidatorsState)[validatorsState] = state;
   }
-  return [...context.values()].flat();
+
+  return state;
 }
 
-function setContext(control: AbstractControl, contextValue: ValidatorFn[], context: string): void {
-  const contexts: AddValidatorsContexts = getContexts(control) ?? new Map();
-  contexts.set(context, contextValue);
-  (control as AbstractControlWithContexts)[addValidatorsContext] = contexts;
+function updateValueAndValidity(
+  control: AbstractControl,
+  opts?: Pick<ControlOptions, 'onlySelf' | 'emitEvent'>
+): void {
+  control.updateValueAndValidity({
+    onlySelf: opts?.onlySelf,
+    emitEvent: opts?.emitEvent
+  });
 }
 
-function setExistingValidators(control: AbstractControl, validators: ExistingValidators): void {
-  (control as AbstractControlWithExistingValidators)[existingValidators] = validators;
-}
+const validatorsState: unique symbol = Symbol('validatorsState');
 
-const addValidatorsContext: unique symbol = Symbol('addValidatorsContext');
-const existingValidators: unique symbol = Symbol('existingValidators');
+export type AddValidatorsContexts =
+  Map<string, Set<ValidatorFn>>;
 
-export type AddValidatorsContexts = Map<string, ValidatorFn[]>;
-export type ExistingValidators = Set<ValidatorFn>;
-type AbstractControlWithContexts = AbstractControl & { [addValidatorsContext]: AddValidatorsContexts };
-type AbstractControlWithExistingValidators = AbstractControl & { [existingValidators]: ExistingValidators };
+export type InitialValidators =
+  Set<ValidatorFn>;
+
+type ValidatorsState = {
+  contexts: AddValidatorsContexts;
+  initialValidators: InitialValidators;
+};
+
+type AbstractControlWithValidatorsState =
+  AbstractControl & {
+  [validatorsState]?: ValidatorsState;
+};
