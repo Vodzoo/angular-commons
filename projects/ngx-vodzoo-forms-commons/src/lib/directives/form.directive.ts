@@ -114,7 +114,12 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     getFormComponentId(this._elementLocalName$(), this.formIndex$())
   );
   private readonly _invalidFields$: WritableSignal<string[]> = signal([]);
+  /**
+   * @deprecated use invalidControls$ instead
+   */
   public readonly invalidFields$: Signal<string[]> = this._invalidFields$.asReadonly();
+  private readonly _invalidControls$: WritableSignal<{control: FormControl; label: string}[]> = signal([]);
+  public readonly invalidControls$: Signal<{control: FormControl; label: string}[]> = this._invalidControls$.asReadonly();
   private readonly _statusChanges$: WritableSignal<FormControlStatus | undefined> = signal(undefined);
   public readonly statusChanges$: Signal<FormControlStatus | undefined> = this._statusChanges$.asReadonly();
   private readonly _valueChanges$: WritableSignal<FormValue<T, UserTypes> | undefined> = signal(undefined);
@@ -176,7 +181,11 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   public formCreated: OutputEmitterRef<FormGroup<T>> = output(); // root form only
   public valueChanged: OutputEmitterRef<ValueChanges<T, UserTypes>> = output(); // root form only
   public statusChanged: OutputEmitterRef<StatusChanges> = output(); // root form only
-  public invalidFields: OutputEmitterRef<string[]> = output(); // root form only
+  /**
+   * @deprecated use invalidControls instead
+   */
+  public invalidFields: OutputEmitterRef<string[]> = output();
+  public invalidControls: OutputEmitterRef<{control: FormControl; label: string}[]> = output();
   public eventEmitted: OutputEmitterRef<FormEvent<any, string, any>> = output(); // root form only
 
 
@@ -400,13 +409,22 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   }
 
 
-  private handleInvalidFieldsChanges(): Observable<string[]> {
+  private handleInvalidFieldsChanges(): Observable<unknown> {
     return this.form$().statusChanges
       .pipe(
         startWith(this.form$().status),
         tap(() => this.cdr.markForCheck()),
         debounceTime(0),
-        map(value => value === 'VALID' ? [] : this.getLabels(this.findInvalidControls(this.form$()))),
+        map(value => {
+          if (value === 'VALID') {
+            return [];
+          }
+          const invalidControls: AbstractControl[] = this.findInvalidControls(this.form$());
+          return invalidControls.map(control => ({control: control as FormControl, label: getLabel(control)}))
+        }),
+        tap(value => this.invalidControls.emit(value)),
+        tap(value => this._invalidControls$.set(value)),
+        map(value => value.map(invalid => invalid.label)),
         tap(value => this.invalidFields.emit(value)),
         tap(value => this._invalidFields$.set(value)),
         takeUntilDestroyed(this.destroyRef)

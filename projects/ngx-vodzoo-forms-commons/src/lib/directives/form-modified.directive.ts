@@ -23,7 +23,7 @@ export interface FormValueModified {
 
 export interface FormModifiedDiffEntry {
   path: (string | number)[];
-  pathString: string;
+  pathString: string; // TODO use Paths?
   previousValue: any;
   currentValue: any;
 }
