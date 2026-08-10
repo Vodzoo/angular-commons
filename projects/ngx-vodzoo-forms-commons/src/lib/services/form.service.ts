@@ -36,6 +36,12 @@ export interface FormServiceConfig {
 
 export type StorageSaveOn = 'userChange' | 'nonUserChange' | 'dataChange' | 'rawDataChange';
 
+export function getFormComponentId(componentId: string, formIndex?: number | null): string {
+  const formIndexSuffix: string =
+    formIndex !== undefined && formIndex !== null ? `_${formIndex}` : '';
+  return `${componentId}${formIndexSuffix}`;
+}
+
 @Injectable()
 export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> implements OnDestroy {
 
@@ -184,7 +190,7 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
 
   public patchForm(value: FormValue<T, UserTypes>, formIndex?: number): void {
     this.patchFormValue.next({
-      componentId: `${this.defaultComponentId}${formIndex ?? ''}`,
+      componentId: getFormComponentId(this.defaultComponentId, formIndex),
       value
     })
   }
