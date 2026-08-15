@@ -268,16 +268,12 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
    *
    *           const onInitFn: FormFieldLogicFnSpecArgsFn<Address, any, Date> = ({form, index, config}) => { // INIT LOGIC }
    *
-   *           const onValueChangeFn: FormFieldLogicFnSpecArgsFn<Address, any, Date> = ({form, index, config}): FormFieldLogicFnState | void => {
-   *             if (form.controls.country.value === '12') {
-   *               return {
-   *                 stopExecution: true,
-   *               }
-   *             }
-   *           }
+   *           spec.onValueChange?.({
+   *             pauseWhen: ({form}) => form.controls.country.value === '12',
+   *             execute: ({form, index, config}) => { // VALUE LOGIC }
+   *           }); // logic is paused while form.controls.country.value === '12'
    *
    *           spec.onInit?.(onInitFn);
-   *           spec.onValueChange?.(onValueChangeFn); // logic will stop when form.controls.country.value === '12'
    *         },
    *         voivodeship: ({ onInit, onDestroy, onValueChange, onConfigChange, onLogicRecalculate }) => {
    *           this.formAddressService.getFormFieldsLogic().voivodeship?.({onValueChange, onConfigChange, onLogicRecalculate}); // no onInit and onDestroy logic will be triggered from formAddressService

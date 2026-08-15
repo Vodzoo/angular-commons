@@ -282,10 +282,10 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   }
 
   private runLogic(logic: FormControlsLogic<T, UserConfig, UserTypes>, phase: LogicPhase, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
-    Object.keys(logic).forEach((key: string) => {
+    for (const key of Object.keys(logic)) {
       const fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes> = (logic as any)[key];
       if (typeof fieldLogic !== 'function') {
-        return;
+        continue;
       }
       switch (phase) {
         case 'init':
@@ -306,79 +306,52 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
         default:
           break;
       }
-    })
+    }
   }
 
   private initLogic(fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
     fieldLogic({
-      onInit: (argsFn) => {
-        argsFn?.({
-          form: this.formDirective.form$(),
-          config,
-          index: this.formDirective.formIndex$(),
-        });
-      }
+      onInit: (handler) => this.executeLogic(handler, config)
     });
   }
 
   private destroyLogic(fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
     fieldLogic({
-      onDestroy: (argsFn) => {
-        argsFn?.({
-          form: this.formDirective.form$(),
-          config,
-          index: this.formDirective.formIndex$(),
-        });
-      }
+      onDestroy: (handler) => this.executeLogic(handler, config)
     });
   }
 
-  private configChangeState: FormFieldLogicFnState | undefined | void;
   private configChange(fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
-    if (this.configChangeState?.stopExecution) {
-      return;
-    }
     fieldLogic({
-      onConfigChange: (argsFn) => {
-        this.configChangeState = argsFn?.({
-          form: this.formDirective.form$(),
-          config,
-          index: this.formDirective.formIndex$(),
-        });
-      }
+      onConfigChange: (handler) => this.executeLogic(handler, config)
     });
   }
 
-  private valueChangeState: FormFieldLogicFnState | undefined | void;
   private valueChange(fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
-    if (this.valueChangeState?.stopExecution) {
-      return;
-    }
     fieldLogic({
-      onValueChange: (argsFn) => {
-        this.valueChangeState = argsFn?.({
-          form: this.formDirective.form$(),
-          config,
-          index: this.formDirective.formIndex$(),
-        });
-      }
+      onValueChange: (handler) => this.executeLogic(handler, config)
     });
   }
 
-  private recalculationState: FormFieldLogicFnState | undefined | void;
   private recalculateLogic(fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
-    if (this.recalculationState?.stopExecution) {
+    fieldLogic({
+      onLogicRecalculate: (handler) => this.executeLogic(handler, config)
+    });
+  }
+
+  private executeLogic(handler: FormFieldLogicHandler<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
+    const args: FormFieldLogicFnArgs<T, UserConfig, UserTypes> = {
+      form: this.formDirective.form$(),
+      config,
+      index: this.formDirective.formIndex$()
+    };
+    if (typeof handler === 'function') {
+      handler(args);
       return;
     }
-    fieldLogic({
-      onLogicRecalculate: (argsFn) => {
-        this.recalculationState = argsFn?.({
-          form: this.formDirective.form$(),
-          config,
-          index: this.formDirective.formIndex$()
-        })
-      }
-    });
+    if (!handler.pauseWhen(args)) {
+      handler.execute(args);
+    }
   }
 
   private setConfigChange(value: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
@@ -436,14 +409,22 @@ type RecursivePartialFormControlsLogic<T, UserConfig, UserTypes> = {
 type ValueFormFieldLogic<T, UserConfig, UserTypes> = T extends AllowedTypes<UserTypes> ? FormFieldLogicFn<any, UserConfig, UserTypes> : RecursivePartialFormControlsLogic<T, UserConfig, UserTypes>;
 export type FormFieldLogicFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (spec: FormFieldLogicFnSpec<T, UserConfig, UserTypes>) => void;
 export interface FormFieldLogicFnSpec<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
-  onInit?: (argsFn: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>) => any,
-  onDestroy?: (argsFn: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>) => any,
-  onConfigChange?: (argsFn: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>) => any,
-  onValueChange?: (argsFn: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>) => any,
-  onLogicRecalculate?: (argsFn: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>) => any,
+  onInit?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
+  onDestroy?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
+  onConfigChange?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
+  onValueChange?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
+  onLogicRecalculate?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
 }
-export type FormFieldLogicFnSpecArgsFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (args: {form: FormGroup<T>, config: FormControlsConfigChange<T, UserConfig, UserTypes>, index?: number}) => FormFieldLogicFnState | undefined | void;
-export interface FormFieldLogicFnState {
-  stopExecution: boolean;
+export interface FormFieldLogicFnArgs<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
+  form: FormGroup<T>;
+  config: FormControlsConfigChange<T, UserConfig, UserTypes>;
+  index?: number;
 }
+export type FormFieldLogicFnSpecArgsFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (args: FormFieldLogicFnArgs<T, UserConfig, UserTypes>) => void;
+export type FormFieldLogicPauseWhenFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (args: FormFieldLogicFnArgs<T, UserConfig, UserTypes>) => boolean;
+export interface FormFieldLogicExecution<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
+  pauseWhen: FormFieldLogicPauseWhenFn<T, UserConfig, UserTypes>;
+  execute: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>;
+}
+export type FormFieldLogicHandler<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes> | FormFieldLogicExecution<T, UserConfig, UserTypes>;
 export type LogicPhase = 'init' | 'config' | 'value' | 'recalculate' | 'destroy';
