@@ -323,7 +323,12 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     initialValidators?: FormValidators<T, UserTypes> | null
   ): FormGroup<T> {
     markAsUiChange(formArray);
-    const control: FormGroup<T> = this.getFormGroup(initialValue, initialDisabledState, initialValidators);
+    const control: FormGroup<T> = this.getFormGroup(
+      initialValue,
+      initialDisabledState,
+      initialValidators,
+      formArray.length
+    );
     formArray.push(control);
     return control;
   }

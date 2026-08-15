@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {FormArray, FormControl} from '@angular/forms';
+import {FormArray, FormControl, FormGroup} from '@angular/forms';
 import {isChangedByUiUnset} from '../directives/form-field.directive';
 import {FormService} from './form.service';
 
@@ -15,6 +15,23 @@ describe('FormService', () => {
 
   it('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  describe('addGroup', () => {
+    it('passes the appended group index to getFormGroup', () => {
+      const first = new FormGroup({});
+      const second = new FormGroup({});
+      const added = new FormGroup({});
+      const formArray = new FormArray([first, second]);
+      const getFormGroup = spyOn(service, 'getFormGroup').and.returnValue(added);
+
+      const result = service.addGroup(formArray);
+
+      expect(getFormGroup).toHaveBeenCalledWith(undefined, undefined, undefined, 2);
+      expect(getFormGroup).toHaveBeenCalledTimes(1);
+      expect(result).toBe(added);
+      expect(formArray.at(2)).toBe(added);
+    });
   });
 
   describe('removeFromArray', () => {
