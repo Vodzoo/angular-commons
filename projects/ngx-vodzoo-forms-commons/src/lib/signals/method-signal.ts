@@ -18,17 +18,19 @@ export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R,
             args.onError?.(error);
             return EMPTY;
           }
-          return isObservable(comp) ? comp.pipe(
+          const result$: Observable<R> = isObservable(comp) ? comp.pipe(
             catchError((error) => {
               console.error(error);
               args.onError?.(error);
               return EMPTY;
             }),
           ) : of(comp);
-        }),
-        tap(value => {
-          previousMethodValue = value as P;
-          previousMethodParams = args.params();
+          return result$.pipe(
+            tap(value => {
+              previousMethodValue = value as P;
+              previousMethodParams = methodParams;
+            })
+          );
         })
       ),
   );
