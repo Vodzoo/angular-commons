@@ -361,8 +361,13 @@ export class FormService<T extends { [K in keyof T]: AbstractControl }, UserConf
     formArray: FormArray<R>,
     control: R
   ): void {
+    const index = formArray.controls.indexOf(control);
+    if (index < 0) {
+      return;
+    }
+
     markAsUiChange(formArray);
-    formArray.removeAt(formArray.controls.indexOf(control));
+    formArray.removeAt(index);
   }
 
 
