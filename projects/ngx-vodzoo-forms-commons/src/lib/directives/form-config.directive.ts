@@ -8,7 +8,8 @@ import {
   OnDestroy,
   OnInit,
   output,
-  untracked
+  Signal,
+  untracked,
 } from '@angular/core';
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
@@ -90,6 +91,11 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     }
     this.formControlsConfig = this._formControlsConfig;
   }
+
+  /**
+   * Signals
+   */
+  private _componentContext: Signal<unknown> | undefined = undefined;
 
   /**
    * Effects
@@ -270,6 +276,11 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * Other methods
    * ------------------------------------
    */
+  public withComponentContext(signal: Signal<unknown>): this {
+    this._componentContext = signal;
+    return this;
+  }
+
   private mapConfigToChange(value: FormControlsConfig<T, UserConfig, UserTypes> | undefined): FormControlsConfigChange<T, UserConfig, UserTypes> {
     const mergedConfig: FormControlsConfig<T, UserConfig, UserTypes> = value !== this._defaultFormFieldsConfig ? {...this._defaultFormFieldsConfig, ...value} : value;
     const change: FormControlsConfigChange<T, UserConfig, UserTypes> = {};
@@ -343,7 +354,8 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     const args: FormFieldLogicFnArgs<T, UserConfig, UserTypes> = {
       form: this.formDirective.form$(),
       config,
-      index: this.formDirective.formIndex$()
+      index: this.formDirective.formIndex$(),
+      componentContext: this._componentContext,
     };
     if (typeof handler === 'function') {
       handler(args);
@@ -419,6 +431,7 @@ export interface FormFieldLogicFnArgs<T extends { [K in keyof T]: AbstractContro
   form: FormGroup<T>;
   config: FormControlsConfigChange<T, UserConfig, UserTypes>;
   index?: number;
+  componentContext: Signal<unknown> | undefined;
 }
 export type FormFieldLogicFnSpecArgsFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (args: FormFieldLogicFnArgs<T, UserConfig, UserTypes>) => void;
 export type FormFieldLogicPauseWhenFn<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = (args: FormFieldLogicFnArgs<T, UserConfig, UserTypes>) => boolean;
