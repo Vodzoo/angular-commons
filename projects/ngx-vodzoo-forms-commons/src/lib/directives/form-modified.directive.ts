@@ -1,11 +1,10 @@
 import {computed, Directive, effect, EffectRef, inject, InjectionToken, input, output, Signal} from '@angular/core';
 import {FORM_SERVICE_CONFIG, FormServiceConfig, STORAGE} from "../services/form.service";
-import {FormDirective, FormRawValue, ValueChanges} from "./form.directive";
+import {FormDirective, FormRawValue} from "./form.directive";
 import {AbstractControl} from "@angular/forms";
 import {getFormValueChanges$} from "../formValues";
 import {methodSignal} from "../signals/method-signal";
-import {filter, map, of} from "rxjs";
-import {setFormModified} from "../formModified";
+import {getBeforeUserChange$, setFormModified} from "../formModified";
 
 export interface FormModifiedConfig {
   equalFn: FormModifiedEqualFn;
@@ -88,24 +87,15 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   private readonly valueBeforeChange: Signal<FormRawValue<T> | undefined> = methodSignal({
     params: computed(() => {
       return {
-        valueChanges: this.valueChanges(),
+        formValue: getBeforeUserChange$(this.formDirective.form$())(),
         storageValue: this.storageValue(),
       }
     }),
     computation: ({ methodParams }) => {
       const storageValue: FormRawValue<T> | undefined = methodParams.storageValue;
-      const valueChanges: ValueChanges<T, unknown> | undefined = methodParams.valueChanges;
-      if (storageValue) {
-        return storageValue;
-      }
-      if (!valueChanges) {
-        return undefined;
-      }
-      return of(valueChanges)
-        .pipe(
-          filter(value => value.firstUiChange),
-          map(value => value.previous.rawValue),
-        )
+      const formValue: FormRawValue<T> | undefined = methodParams.formValue?.rawValue;
+
+      return storageValue ?? formValue;
     }
   });
 
