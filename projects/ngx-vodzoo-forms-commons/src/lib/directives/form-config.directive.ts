@@ -119,7 +119,19 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
         this.formControlsLogic = this._formFieldLogic.value;
       })
     }
-  })
+  });
+
+  private readonly reloadLogicAfterComponentContext = effect(() => {
+    if (this._componentContext()?.()) {
+      untracked(() => {
+        this._defaultFormFieldsConfigChange = this.mapConfigToChange(this._defaultFormFieldsConfig);
+        const targetChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._defaultFormFieldsConfig);
+        const sourceChange: FormControlsConfigChange<T, UserConfig, UserTypes> = this.mapConfigToChange(this._formControlsConfig);
+        const merged: FormControlsConfigChange<T, UserConfig, UserTypes> = mergeDeep(targetChange, sourceChange, this.mergeConfig);
+        this.runLogic(this._formFieldLogic.value, 'componentContext', merged);
+      })
+    }
+  });
 
 
 
@@ -328,6 +340,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
         case 'recalculate':
           this.recalculateLogic(fieldLogic, config);
           break;
+        case 'componentContext':
+          this.componentContextChange(fieldLogic, config);
+          break;
         default:
           break;
       }
@@ -364,12 +379,18 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     });
   }
 
+  private componentContextChange(fieldLogic: FormFieldLogicFn<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
+    fieldLogic({
+      onComponentContextChange: (handler) => this.executeLogic(handler, config)
+    });
+  }
+
   private executeLogic(handler: FormFieldLogicHandler<T, UserConfig, UserTypes>, config: FormControlsConfigChange<T, UserConfig, UserTypes>): void {
     const args: FormFieldLogicFnArgs<T, UserConfig, UserTypes> = {
       form: this.formDirective.form$(),
       config,
       index: this.formDirective.formIndex$(),
-      componentContext: this._componentContext,
+      componentContext: this._componentContext(),
     };
     if (typeof handler === 'function') {
       handler(args);
@@ -440,6 +461,7 @@ export interface FormFieldLogicFnSpec<T extends { [K in keyof T]: AbstractContro
   onConfigChange?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
   onValueChange?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
   onLogicRecalculate?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
+  onComponentContextChange?: (handler: FormFieldLogicHandler<T, UserConfig, UserTypes>) => any,
 }
 export interface FormFieldLogicFnArgs<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> {
   form: FormGroup<T>;
@@ -454,4 +476,4 @@ export interface FormFieldLogicExecution<T extends { [K in keyof T]: AbstractCon
   execute: FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes>;
 }
 export type FormFieldLogicHandler<T extends { [K in keyof T]: AbstractControl }, UserConfig, UserTypes> = FormFieldLogicFnSpecArgsFn<T, UserConfig, UserTypes> | FormFieldLogicExecution<T, UserConfig, UserTypes>;
-export type LogicPhase = 'init' | 'config' | 'value' | 'recalculate' | 'destroy';
+export type LogicPhase = 'init' | 'config' | 'value' | 'recalculate' | 'destroy' | 'componentContext';
