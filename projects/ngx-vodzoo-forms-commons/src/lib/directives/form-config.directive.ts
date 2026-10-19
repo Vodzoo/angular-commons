@@ -106,7 +106,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    */
 
   private readonly reloadConfig = effect(() => {
-    if (this.formService.reloadConfigSignals() || this._reloadConfigSignals()?.()) {
+    const serviceReload = this.formService.reloadConfigSignals();
+    const componentReload = this._reloadConfigSignals()?.();
+    if (serviceReload || componentReload) {
       untracked(() => {
         this.recalculateConfig();
       })
@@ -114,7 +116,9 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   });
 
   private readonly reloadLogic = effect(() => {
-    if (this.formService.reloadLogicSignals() || this._reloadLogicSignals()?.()) {
+    const serviceReload = this.formService.reloadLogicSignals();
+    const componentReload = this._reloadLogicSignals()?.();
+    if (serviceReload || componentReload) {
       untracked(() => {
         this.formControlsLogic = this._formFieldLogic.value;
       })
