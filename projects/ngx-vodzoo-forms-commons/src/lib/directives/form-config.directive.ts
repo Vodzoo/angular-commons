@@ -8,8 +8,10 @@ import {
   OnDestroy,
   OnInit,
   output,
+  signal,
   Signal,
   untracked,
+  WritableSignal,
 } from '@angular/core';
 import {AbstractControl, FormControlStatus, FormGroup} from "@angular/forms";
 import {FormDirective, FormRawValue} from "./form.directive";
@@ -95,22 +97,24 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
   /**
    * Signals
    */
-  private _componentContext: Signal<unknown> | undefined = undefined;
+  private readonly _componentContext: WritableSignal<Signal<unknown> | undefined> = signal(undefined);
+  private readonly _reloadConfigSignals: WritableSignal<Signal<unknown> | undefined> = signal(undefined);
+  private readonly _reloadLogicSignals: WritableSignal<Signal<unknown> | undefined> = signal(undefined);
 
   /**
    * Effects
    */
 
   private readonly reloadConfig = effect(() => {
-    if (this.formService.reloadConfigSignals()) {
+    if (this.formService.reloadConfigSignals() || this._reloadConfigSignals()?.()) {
       untracked(() => {
         this.recalculateConfig();
       })
     }
-  })
+  });
 
   private readonly reloadLogic = effect(() => {
-    if (this.formService.reloadLogicSignals()) {
+    if (this.formService.reloadLogicSignals() || this._reloadLogicSignals()?.()) {
       untracked(() => {
         this.formControlsLogic = this._formFieldLogic.value;
       })
@@ -277,7 +281,17 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
    * ------------------------------------
    */
   public withComponentContext(signal: Signal<unknown>): this {
-    this._componentContext = signal;
+    this._componentContext.set(signal);
+    return this;
+  }
+
+  public withReloadConfigSignals(signal: Signal<unknown>): this {
+    this._reloadConfigSignals.set(signal);
+    return this;
+  }
+
+  public withReloadLogicSignals(signal: Signal<unknown>): this {
+    this._reloadLogicSignals.set(signal);
     return this;
   }
 
