@@ -228,15 +228,24 @@ export class FormConfigDirective<T extends { [K in keyof T]: AbstractControl }, 
     }
 
     let status: FormControlStatus = this.formDirective.form$().status;
+    let rootStatus: FormControlStatus = this.formDirective.form$().root.status;
+    let anyStatusChanged: boolean = false;
     this.formDirective.form$().root.valueChanges.pipe(
-      debounceTime(0),
-      distinctUntilChanged((prev, cur) => {
+      tap(() => {
         const curStatus: FormControlStatus = this.formDirective.form$().status;
         const curStatusRoot: FormControlStatus = this.formDirective.form$().root.status;
         const statusChanged: boolean = curStatus !== status;
-        const statusChangedRoot: boolean = curStatusRoot !== curStatus;
+        const statusChangedRoot: boolean = curStatusRoot !== rootStatus;
         if (statusChanged || statusChangedRoot) {
           status = curStatus;
+          rootStatus = curStatusRoot;
+          anyStatusChanged = true;
+        }
+      }),
+      debounceTime(0),
+      distinctUntilChanged((prev, cur) => {
+        if (anyStatusChanged) {
+          anyStatusChanged = false;
           return false;
         }
         if (prev === cur) {
