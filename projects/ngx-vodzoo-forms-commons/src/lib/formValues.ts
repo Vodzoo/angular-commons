@@ -1,6 +1,7 @@
 import { AbstractControl, FormArray, FormGroup } from "@angular/forms";
-import {FormValue, ValueChanges} from "./directives/form.directive";
+import { FormValue, FormValues, ValueChanges} from "./directives/form.directive";
 import { computed, isSignal, Signal, signal, WritableSignal } from "@angular/core";
+import { getRootBeforeUserChange$ } from "./formModified";
 
 export function setRootFormValueChanges<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>, values: ValueChanges<T, UserTypes>): void {
   ensureSignal(formGroup.root, rootFormValueChanges).set(values);
@@ -18,28 +19,41 @@ export function getRootFormValueChanges$<T extends { [K in keyof T]: AbstractCon
   return ensureSignal(formGroup.root, rootFormValueChanges).asReadonly();
 }
 
-export function getFormValueChanges<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes>(formGroup: FormGroup<T>): ValueChanges<T, UserTypes> | undefined {
+export function getFormValueChanges<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes>(formGroup: FormGroup<T>): (ValueChanges<T, UserTypes> & {beforeUserChange?: FormValues<T, UserTypes>}) | undefined {
   return getFormValueChanges$<T, UserTypes>(formGroup)();
 }
 
-export function getFormValueChanges$<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes>(formGroup: FormGroup<T>): Signal<ValueChanges<T, UserTypes> | undefined> {
+export function getFormValueChanges$<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes>(formGroup: FormGroup<T>): Signal<(ValueChanges<T, UserTypes> & {beforeUserChange?: FormValues<T, UserTypes>}) | undefined> {
   const path: string[] | null = getFormPath(formGroup);
   const changes = getRootFormValueChanges$(formGroup);
+  const beforeUserChange = getRootBeforeUserChange$(formGroup);
   return computed(() => {
     const rootValueChanges = changes();
+    const rootBeforeUserChange = beforeUserChange();
     if (!rootValueChanges) {
       return undefined;
     }
     if (!path) {
-      return rootValueChanges;
+      return {
+        ...rootValueChanges,
+        beforeUserChange: rootBeforeUserChange?.previous,
+      };
     }
 
+    const beforeUserChangeRawValue = getNestedValue(rootBeforeUserChange?.previous.rawValue, path, false);
+    const beforeUserChangeValue = getNestedValue(rootBeforeUserChange?.previous.value, path, false);
     const previousRawValue = getNestedValue(rootValueChanges?.previous.rawValue, path);
     const previousValue = getNestedValue(rootValueChanges?.previous.value, path);
     const currentRawValue = getNestedValue(rootValueChanges?.current.rawValue, path);
     const currentValue = getNestedValue(rootValueChanges?.current.value, path);
     return {
       ...rootValueChanges,
+      beforeUserChange: beforeUserChangeRawValue === undefined
+        ? undefined
+        : {
+          rawValue: beforeUserChangeRawValue,
+          value: beforeUserChangeValue ?? {},
+        },
       previous: {
         rawValue: previousRawValue,
         value: previousValue,
@@ -115,8 +129,8 @@ function getFormPath(control: AbstractControl): string[] | null {
   return search(root, []) ? path : null;
 }
 
-export function getNestedValue(obj: any, path: string[]): any {
-  return path.reduce((acc, key) => (acc && key in acc ? acc[key] : null), obj) ?? {};
+export function getNestedValue(obj: any, path: string[], fallbackToEmptyObject: boolean = true): any {
+  return path.reduce((acc, key) => (acc && key in acc ? acc[key] : null), obj) ?? (fallbackToEmptyObject ? {} : undefined);
 }
 
 

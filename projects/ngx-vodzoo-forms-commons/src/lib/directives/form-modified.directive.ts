@@ -1,10 +1,21 @@
-import {computed, Directive, effect, EffectRef, inject, InjectionToken, input, output, Signal} from '@angular/core';
+import {
+  computed,
+  Directive,
+  effect,
+  EffectRef,
+  inject,
+  InjectionToken,
+  input,
+  output,
+  Signal,
+  untracked
+} from '@angular/core';
 import {FORM_SERVICE_CONFIG, FormServiceConfig, STORAGE} from "../services/form.service";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {AbstractControl} from "@angular/forms";
 import {getFormValueChanges$} from "../formValues";
 import {methodSignal} from "../signals/method-signal";
-import {getBeforeUserChange$, setFormModified} from "../formModified";
+import {getRootBeforeUserChange$, setFormModified} from "../formModified";
 
 export interface FormModifiedConfig {
   equalFn: FormModifiedEqualFn;
@@ -86,16 +97,23 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
    */
   private readonly valueBeforeChange: Signal<FormRawValue<T> | undefined> = methodSignal({
     params: computed(() => {
+      const beforeUserChange = getRootBeforeUserChange$(untracked(() => this.formDirective.form$()))();
+      const storageValue = this.storageValue();
+      if (!beforeUserChange && !storageValue) {
+        return undefined;
+      }
       return {
-        formValue: getBeforeUserChange$(this.formDirective.form$())(),
-        storageValue: this.storageValue(),
+        beforeUserChange,
+        storageValue,
       }
     }),
     computation: ({ methodParams }) => {
       const storageValue: FormRawValue<T> | undefined = methodParams.storageValue;
-      const formValue: FormRawValue<T> | undefined = methodParams.formValue?.rawValue;
+      if (storageValue) {
+        return storageValue;
+      }
 
-      return storageValue ?? formValue;
+      return this.valueChanges()?.beforeUserChange?.rawValue;
     }
   });
 

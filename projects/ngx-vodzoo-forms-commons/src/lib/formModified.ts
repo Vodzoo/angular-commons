@@ -1,7 +1,7 @@
 import { AbstractControl, FormGroup } from "@angular/forms";
 import { isSignal, Signal, signal, WritableSignal } from "@angular/core";
 import { FormValueModified } from "./directives/form-modified.directive";
-import { FormValues } from "./directives/form.directive";
+import { ValueChanges } from "./directives/form.directive";
 
 /**
  *     Add in form host directives section:
@@ -15,8 +15,8 @@ export function setFormModified<T extends { [K in keyof T]: AbstractControl<any,
   ensureSignal(formGroup, formModified).set(modifications);
 }
 
-export function setBeforeUserChange<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>, values: FormValues<T, UserTypes>): void {
-  ensureSignal(formGroup, beforeUserChange).set(values);
+export function setRootBeforeUserChange<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>, values: ValueChanges<T, UserTypes>): void {
+  ensureSignal(formGroup.root, beforeUserChange).set(values);
 }
 
 export function getFormModified<T extends { [K in keyof T]: AbstractControl<any, any>; }>(formGroup: FormGroup<T>): FormValueModified | undefined {
@@ -27,12 +27,12 @@ export function getFormModified$<T extends { [K in keyof T]: AbstractControl<any
   return ensureSignal<FormValueModified>(formGroup, formModified).asReadonly();
 }
 
-export function getBeforeUserChange<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>): FormValues<T, UserTypes> | undefined {
-  return getBeforeUserChange$<T, UserTypes>(formGroup)();
+export function getRootBeforeUserChange<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>): ValueChanges<T, UserTypes> | undefined {
+  return getRootBeforeUserChange$<T, UserTypes>(formGroup)();
 }
 
-export function getBeforeUserChange$<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>): Signal<FormValues<T, UserTypes> | undefined> {
-  return ensureSignal<FormValues<T, UserTypes>>(formGroup, beforeUserChange).asReadonly();
+export function getRootBeforeUserChange$<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>): Signal<ValueChanges<T, UserTypes> | undefined> {
+  return ensureSignal<ValueChanges<T, UserTypes>>(formGroup.root, beforeUserChange).asReadonly();
 }
 
 

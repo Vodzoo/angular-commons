@@ -56,7 +56,7 @@ import {FormEventService} from "../services/form-event.service";
 import {FormEvent} from "./form-events.directive";
 import { markAllAsTouched } from "../markAllAsTouched";
 import { setRootFormInitialValue, setRootFormValueChanges } from "../formValues";
-import {setBeforeUserChange} from "../formModified";
+import {setRootBeforeUserChange} from "../formModified";
 
 
 export const DEFAULT_FORM_CONFIG: FormConfig = {
@@ -381,7 +381,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
         })),
         tap((value: ValueChanges<T, UserTypes>) => {
           if (firstUiChange && uiChange) {
-            setBeforeUserChange(this.form$(), value.previous);
+            setRootBeforeUserChange(this.form$(), value);
             firstUiChange = false;
           }
         }),
