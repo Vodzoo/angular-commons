@@ -1,7 +1,8 @@
 import {Component, signal} from '@angular/core';
-import {ComponentFixture, fakeAsync, TestBed, tick} from '@angular/core/testing';
+import {ComponentFixture, TestBed} from '@angular/core/testing';
 import {FormControl, FormGroup} from '@angular/forms';
 import {By} from '@angular/platform-browser';
+import {vi} from 'vitest';
 import {
   FormConfigDirective,
   FormControlsLogic,
@@ -59,6 +60,10 @@ describe('FormConfigDirective', () => {
     directive = fixture.debugElement.query(By.directive(FormConfigDirective)).injector.get(FormConfigDirective);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should create an instance', () => {
     expect(directive).toBeTruthy();
   });
@@ -75,19 +80,20 @@ describe('FormConfigDirective', () => {
     expect(execution.calls).toEqual({first: 1, second: 2});
   });
 
-  it('pauses and resumes value change logic', fakeAsync(() => {
+  it('pauses and resumes value change logic', async () => {
+    vi.useFakeTimers();
     const execution = createPausableLogic('onValueChange');
     directive.formControlsLogic = execution.logic;
 
     form.controls.first.setValue('first change');
-    tick();
+    await vi.advanceTimersByTimeAsync(0);
     expect(execution.calls).toEqual({first: 0, second: 1});
 
     execution.pause.set(false);
     form.controls.first.setValue('second change');
-    tick();
+    await vi.advanceTimersByTimeAsync(0);
     expect(execution.calls).toEqual({first: 1, second: 2});
-  }));
+  });
 
   it('pauses and resumes recalculation logic', () => {
     const execution = createPausableLogic('onLogicRecalculate');

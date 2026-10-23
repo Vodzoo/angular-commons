@@ -4,10 +4,13 @@
   "compilerOptions": {
     "outDir": "../../out-tsc/spec",
     "types": [
-      "jasmine"
-    ]
+      "vitest/globals",
+      "node"
+    ],
+    "moduleResolution": "bundler"
   },
   "include": [
+    "src/test-setup.ts",
     "**/*.spec.ts",
     "**/*.d.ts"
   ]

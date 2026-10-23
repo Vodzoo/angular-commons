@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import {FormArray, FormControl, FormGroup} from '@angular/forms';
+import {vi} from 'vitest';
 import {isChangedByUiUnset} from '../directives/form-field.directive';
 import {FormService} from './form.service';
 
@@ -23,7 +24,7 @@ describe('FormService', () => {
       const second = new FormGroup({});
       const added = new FormGroup({});
       const formArray = new FormArray([first, second]);
-      const getFormGroup = spyOn(service, 'getFormGroup').and.returnValue(added);
+      const getFormGroup = vi.spyOn(service, 'getFormGroup').mockReturnValue(added);
 
       const result = service.addGroup(formArray);
 
@@ -50,13 +51,13 @@ describe('FormService', () => {
       const second = new FormControl('second', {nonNullable: true});
       const foreign = new FormControl('foreign', {nonNullable: true});
       const formArray = new FormArray([first, second]);
-      const removeAt = spyOn(formArray, 'removeAt').and.callThrough();
+      const removeAt = vi.spyOn(formArray, 'removeAt');
 
       service.removeFromArray(formArray, foreign);
 
       expect(removeAt).not.toHaveBeenCalled();
       expect(formArray.controls).toEqual([first, second]);
-      expect(isChangedByUiUnset(formArray)).toBeTrue();
+      expect(isChangedByUiUnset(formArray)).toBe(true);
     });
   });
 });

@@ -130,12 +130,12 @@ describe('mergeDeep', () => {
 
     expect((Object.prototype as any).polluted).toBeUndefined();
     expect(({} as any).polluted).toBeUndefined();
-    expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBeFalse();
-    expect(Object.prototype.hasOwnProperty.call(result, 'constructor')).toBeFalse();
-    expect(Object.prototype.hasOwnProperty.call(result, 'prototype')).toBeFalse();
-    expect(Object.prototype.hasOwnProperty.call(result.nested, '__proto__')).toBeFalse();
-    expect(Object.prototype.hasOwnProperty.call(result.nested, 'constructor')).toBeFalse();
-    expect(Object.prototype.hasOwnProperty.call(result.nested, 'prototype')).toBeFalse();
+    expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result, 'prototype')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.nested, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.nested, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(result.nested, 'prototype')).toBe(false);
   });
 
   it('does not merge into prototype objects', () => {
@@ -151,7 +151,7 @@ describe('mergeDeep', () => {
     const result = mergeDeep(target, {}, {immutable: true});
 
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
-    expect(result.preserved).toBeTrue();
+    expect(result.preserved).toBe(true);
     expect((Object.prototype as any).polluted).toBeUndefined();
   });
 

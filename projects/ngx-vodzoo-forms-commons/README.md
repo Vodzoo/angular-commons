@@ -17,7 +17,9 @@ After building your library with `ng build ngx-vodzoo-forms-commons`, go to the 
 
 ## Running unit tests
 
-Run `ng test ngx-vodzoo-forms-commons` to execute the unit tests via [Karma](https://karma-runner.github.io).
+From the workspace root, run `npm test` to execute the unit tests with [Vitest](https://vitest.dev/) and jsdom. Use `npm run test:watch` for watch mode, or `npm test -- formValues.spec.ts` to run one spec. No browser installation is required.
+
+Run `npm run test:typecheck` to check the test TypeScript types.
 
 ## Further help
 

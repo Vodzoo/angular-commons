@@ -2,6 +2,7 @@ import {Component} from '@angular/core';
 import {ComponentFixture, TestBed} from '@angular/core/testing';
 import {FormControl, FormGroup} from '@angular/forms';
 import {EMPTY} from 'rxjs';
+import {vi, type Mock} from 'vitest';
 import {getFormModified, getFormModified$} from '../formModified';
 import {FormService, STORAGE} from '../services/form.service';
 import {markAsUiChange} from './form-field.directive';
@@ -34,17 +35,18 @@ describe('FormModifiedDirective', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let child: FormGroup<ChildControls>;
   let form: FormGroup<{child: FormGroup<ChildControls>; other: FormControl<string>}>;
-  let storage: jasmine.SpyObj<Storage>;
+  let storage: {getItem: Mock<Storage['getItem']>; setItem: Mock<Storage['setItem']>};
 
   beforeEach(() => {
     child = new FormGroup({name: new FormControl('initial', {nonNullable: true})});
     form = new FormGroup({child, other: new FormControl('unchanged', {nonNullable: true})});
     const storedValues = new Map<string, string>();
-    storage = jasmine.createSpyObj<Storage>('storage', ['getItem', 'setItem']);
-    storage.getItem.and.callFake(key => storedValues.get(key) ?? null);
-    storage.setItem.and.callFake((key, value) => {
-      storedValues.set(key, value);
-    });
+    storage = {
+      getItem: vi.fn<Storage['getItem']>(key => storedValues.get(key) ?? null),
+      setItem: vi.fn<Storage['setItem']>((key, value) => {
+        storedValues.set(key, value);
+      }),
+    };
 
     TestBed.configureTestingModule({
       imports: [TestHostComponent],
@@ -146,7 +148,7 @@ describe('FormModifiedDirective', () => {
     render();
     editName('edited');
     TestBed.flushEffects();
-    expect(getFormModified(child)?.modified).toBeTrue();
+    expect(getFormModified(child)?.modified).toBe(true);
 
     editName('initial');
     TestBed.flushEffects();

@@ -16,7 +16,13 @@ Run `ng build` to build the project. The build artifacts will be stored in the `
 
 ## Running unit tests
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+Use Node.js 22.13+ (22.x), 24.x, or 26+ and run `npm install` to install dependencies.
+
+Run `npm test` to execute all unit tests once with [Vitest](https://vitest.dev/) and jsdom. The [Angular Vite plugin](https://analogjs.org/docs/features/testing/vitest) compiles Angular decorators and signal inputs/outputs. Tests initialize Angular's `TestBed` in `projects/ngx-vodzoo-forms-commons/src/test-setup.ts`; no browser installation is required.
+
+Run `npm run test:watch` to rerun tests as files change. To run a single spec, use `npm test -- formValues.spec.ts`.
+
+Run `npm run test:typecheck` to check the test TypeScript types.
 
 ## Running end-to-end tests
 

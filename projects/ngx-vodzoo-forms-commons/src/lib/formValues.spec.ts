@@ -62,7 +62,7 @@ describe('form value changes', () => {
     setRootFormValueChanges(form, changes<TestControls>(previous, snapshot(form)));
 
     expect(rootChanges()?.beforeUserChange).toEqual(baseline);
-    expect(rootChanges()?.firstUiChange).toBeFalse();
+    expect(rootChanges()?.firstUiChange).toBe(false);
     expect(nestedChanges()?.beforeUserChange).toEqual({
       rawValue: {city: 'Loaded city'},
       value: {city: 'Loaded city'},
