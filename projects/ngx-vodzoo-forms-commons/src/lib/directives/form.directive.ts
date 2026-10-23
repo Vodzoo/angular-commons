@@ -18,7 +18,7 @@ import {
   Provider,
   Signal,
   signal,
-  Type,
+  Type, untracked,
   WritableSignal
 } from '@angular/core';
 import {
@@ -129,6 +129,8 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
   private readonly initialClasses: string[] = ['form', this._elementLocalName$()];
   private readonly _formReady$: BehaviorSubject<FormGroup<T> | null> = new BehaviorSubject<FormGroup<T> | null>(null);
   public readonly formReady: Observable<FormGroup<T>> = this._formReady$.asObservable().pipe(filter(Boolean), take(1));
+  private readonly _errorsShown: WritableSignal<number | undefined> = signal(undefined);
+  public readonly errorsShown$: Signal<number | undefined> = this._errorsShown.asReadonly();
 
 
 
@@ -258,6 +260,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
             } else {
               conditionValue.applyTo.forEach(markAllAsTouched);
             }
+            this.updateErrorsShown();
           }),
         ).subscribe();
       onCleanup(() => {
@@ -267,6 +270,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
 
     if (value === true) {
       markAllAsTouched(this.form$());
+      this.updateErrorsShown();
     }
     if (value === undefined || value === false) {
       return;
@@ -275,6 +279,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
     const objectValue = value as ShowErrorsWithCustomAbstractControls;
     if (objectValue.show) {
       objectValue.applyTo.forEach(markAllAsTouched);
+      this.updateErrorsShown();
     }
   });
 
@@ -312,6 +317,10 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * Other methods
    * ------------------------------------
    */
+  private updateErrorsShown(): void {
+    untracked(() => this._errorsShown.update(value => (value ?? 0) + 1));
+  }
+
   public getFormValues(): FormValues<T, UserTypes> {
     return {value: this.form$().value, rawValue: this.form$().getRawValue() as FormRawValue<T>};
   }
@@ -422,7 +431,10 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
             return [];
           }
           const invalidControls: AbstractControl[] = this.findInvalidControls(this.form$());
-          return invalidControls.map(control => ({control: control as FormControl, label: getLabel(control)}))
+          return invalidControls.map(control => ({
+            control: control as FormControl,
+            label: getLabel(control)
+          }))
         }),
         tap(value => this.invalidControls.emit(value)),
         tap(value => this._invalidControls$.set(value)),
