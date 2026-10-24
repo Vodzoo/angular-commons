@@ -57,7 +57,7 @@ import {
 import {FormEventService} from "../services/form-event.service";
 import {FormEvent} from "./form-events.directive";
 import { markAllAsTouched } from "../markAllAsTouched";
-import { setRootFormInitialValue, setRootFormValueChanges } from "../formValues";
+import { captureFormValues, setRootFormInitialValue, setRootFormValueChanges } from "../formValues";
 import {setRootBeforeUserChange} from "../formModified";
 
 
@@ -364,7 +364,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
         tap(() => this.cdr.markForCheck()),
         tap(value => this._valueChanges$.set(value)),
         filter(() => this.rootForm),
-        map<FormValue<T, UserTypes>, FormValues<T, UserTypes>>(value => ({value, rawValue: this.form$().getRawValue() as FormRawValue<T>})),
+        map<FormValue<T, UserTypes>, FormValues<T, UserTypes>>(value => captureFormValues<T, UserTypes>(this.form$(), value)),
         pairwise(),
         tap((value) => {
           storageSaveOn.length = 0;

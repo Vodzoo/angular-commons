@@ -13,7 +13,7 @@ import {
 import {FORM_SERVICE_CONFIG, FormServiceConfig, STORAGE} from "../services/form.service";
 import {FormDirective, FormRawValue} from "./form.directive";
 import {AbstractControl} from "@angular/forms";
-import {getFormValueChanges$} from "../formValues";
+import {getFormValueChanges} from "../formValues";
 import {methodSignal} from "../signals/method-signal";
 import {getRootBeforeUserChange$, setFormModified} from "../formModified";
 
@@ -75,7 +75,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
   private readonly storageData = computed(() => this.storage.getItem(this.storageKey()));
   private readonly equalFn = computed(() => this.formModifiedEqualFn() ?? this.formModifiedConfig.equalFn);
   private readonly valueSelectorFn = computed(() => this.formModifiedValueSelectorFn() ?? this.formModifiedConfig.valueSelectorFn);
-  private readonly valueChanges = computed(() => getFormValueChanges$(this.formDirective.form$())());
+  private readonly valueChanges = computed(() => getFormValueChanges(this.formDirective.form$()));
   private readonly storageValue = computed(() => {
     const data: string | null = this.storageData();
     return data ? this.formServiceConfig.parserFn(data) as FormRawValue<T> : undefined
