@@ -1,142 +1,243 @@
-import { AbstractControl, FormArray, FormGroup } from "@angular/forms";
-import { FormValue, FormValues, ValueChanges} from "./directives/form.directive";
-import { computed, isSignal, Signal, signal, WritableSignal } from "@angular/core";
-import { getRootBeforeUserChange$ } from "./formModified";
+import { AbstractControl, FormArray, FormControl, FormGroup } from '@angular/forms';
+import { computed, isSignal, Signal, signal, WritableSignal } from '@angular/core';
+import { FormValue, FormValues, ValueChanges } from './directives/form.directive';
+import { getRootBeforeUserChange$ } from './formModified';
 
-export function setRootFormValueChanges<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>, values: ValueChanges<T, UserTypes>): void {
-  ensureSignal(formGroup.root, rootFormValueChanges).set(values);
+type GroupValues = FormValues<any, any>;
+type GroupValuesIndex = WeakMap<FormGroup, GroupValues>;
+type InitialValuesIndex = WeakMap<FormGroup, unknown>;
+
+// Indexes are tied to individual snapshot objects, not to array positions or paths.
+const snapshotGroups = new WeakMap<object, GroupValuesIndex>();
+const initialGroups = new WeakMap<AbstractControl, InitialValuesIndex>();
+
+const rootFormValueChanges: unique symbol = Symbol('rootFormValueChanges');
+const rootFormInitialValue: unique symbol = Symbol('rootFormInitialValue');
+
+/** Capture the whole form while its structure still matches these values. */
+export function captureFormValues<
+  T extends { [K in keyof T]: AbstractControl },
+  UserTypes
+>(
+  formGroup: FormGroup<T>,
+  value: FormValue<T, UserTypes> = formGroup.value
+): FormValues<T, UserTypes> {
+  const values: FormValues<T, UserTypes> = {
+    value,
+    rawValue: formGroup.getRawValue() as FormValues<T, UserTypes>['rawValue']
+  };
+
+  // A disabled nested group has its own .value, even if its parent omits it.
+  // Capture that value now; never reconstruct it from the root snapshot later.
+  snapshotGroups.set(values, indexCurrentGroups(formGroup, values.rawValue, value));
+  return values;
 }
 
-export function setRootFormInitialValue<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>, values: FormValue<T, UserTypes>): void {
-  (formGroup.root as any)[rootFormInitialValue] = values;
+export function setRootFormValueChanges<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes
+>(formGroup: FormGroup<T>, values: ValueChanges<T, UserTypes>): void {
+  // Both snapshots must already have their own identity indexes. Indexing an old
+  // snapshot against the *current* tree would silently misattribute moved groups.
+  ensureSignal<ValueChanges<T, UserTypes>>(formGroup.root, rootFormValueChanges).set(values);
 }
 
-export function getRootFormValueChanges<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes, R extends { [K in keyof R]: AbstractControl<any, any>; } = T>(formGroup: FormGroup<T>): ValueChanges<R, UserTypes> | undefined {
-  return ensureSignal(formGroup.root, rootFormValueChanges)();
+export function setRootFormInitialValue<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes
+>(formGroup: FormGroup<T>, values: FormValue<T, UserTypes>): void {
+  const root = formGroup.root;
+  (root as any)[rootFormInitialValue] = values;
+  // Initial data may differ from the live form (e.g. when restoring saved data).
+  initialGroups.set(root, indexInitialGroups(root, values));
 }
 
-export function getRootFormValueChanges$<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes, R extends { [K in keyof R]: AbstractControl<any, any>; } = T>(formGroup: FormGroup<T>): Signal<ValueChanges<R, UserTypes> | undefined> {
-  return ensureSignal(formGroup.root, rootFormValueChanges).asReadonly();
+export function getRootFormValueChanges<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes,
+  R extends { [K in keyof R]: AbstractControl<any, any> } = T
+>(formGroup: FormGroup<T>): ValueChanges<R, UserTypes> | undefined {
+  return ensureSignal<ValueChanges<R, UserTypes>>(formGroup.root, rootFormValueChanges)();
 }
 
-export function getFormValueChanges<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes>(formGroup: FormGroup<T>): (ValueChanges<T, UserTypes> & {beforeUserChange?: FormValues<T, UserTypes>}) | undefined {
-  return getFormValueChanges$<T, UserTypes>(formGroup)();
+export function getRootFormValueChanges$<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes,
+  R extends { [K in keyof R]: AbstractControl<any, any> } = T
+>(formGroup: FormGroup<T>): Signal<ValueChanges<R, UserTypes> | undefined> {
+  return ensureSignal<ValueChanges<R, UserTypes>>(formGroup.root, rootFormValueChanges).asReadonly();
 }
 
-export function getFormValueChanges$<T extends { [K in keyof T]: AbstractControl<any, any>; },  UserTypes>(formGroup: FormGroup<T>): Signal<(ValueChanges<T, UserTypes> & {beforeUserChange?: FormValues<T, UserTypes>}) | undefined> {
-  const path: string[] | null = getFormPath(formGroup);
-  const changes = getRootFormValueChanges$(formGroup);
-  const beforeUserChange = getRootBeforeUserChange$(formGroup);
-  return computed(() => {
-    const rootValueChanges = changes();
-    const rootBeforeUserChange = beforeUserChange();
-    if (!rootValueChanges) {
-      return undefined;
-    }
-    if (!path) {
-      return {
-        ...rootValueChanges,
-        beforeUserChange: rootBeforeUserChange?.previous,
-      };
-    }
-
-    const beforeUserChangeRawValue = getNestedValue(rootBeforeUserChange?.previous.rawValue, path, false);
-    const beforeUserChangeValue = getNestedValue(rootBeforeUserChange?.previous.value, path, false);
-    const previousRawValue = getNestedValue(rootValueChanges?.previous.rawValue, path);
-    const previousValue = getNestedValue(rootValueChanges?.previous.value, path);
-    const currentRawValue = getNestedValue(rootValueChanges?.current.rawValue, path);
-    const currentValue = getNestedValue(rootValueChanges?.current.value, path);
-    return {
-      ...rootValueChanges,
-      beforeUserChange: beforeUserChangeRawValue === undefined
-        ? undefined
-        : {
-          rawValue: beforeUserChangeRawValue,
-          value: beforeUserChangeValue ?? {},
-        },
-      previous: {
-        rawValue: previousRawValue,
-        value: previousValue,
-      },
-      current: {
-        rawValue: currentRawValue,
-        value: currentValue,
-      },
-    };
-  });
+export function getFormValueChanges<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes
+>(formGroup: FormGroup<T>): (ValueChanges<T, UserTypes> & {
+  beforeUserChange?: FormValues<T, UserTypes>
+}) | undefined {
+  const root = formGroup.root;
+  return projectFormValueChanges(
+    formGroup,
+    root,
+    ensureSignal<ValueChanges<T, UserTypes>>(root, rootFormValueChanges)(),
+    getRootBeforeUserChange$<T, UserTypes>(formGroup)()
+  );
 }
 
-export function getRootFormInitialValue<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes, R extends { [K in keyof R]: AbstractControl<any, any>; } = T>(formGroup: FormGroup<T>): FormValue<R, UserTypes> {
+/** Project the last root-level change onto the same group in both snapshots. */
+export function getFormValueChanges$<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes
+>(formGroup: FormGroup<T>): Signal<(ValueChanges<T, UserTypes> & {
+  beforeUserChange?: FormValues<T, UserTypes>
+}) | undefined> {
+  const root = formGroup.root;
+  const changes = ensureSignal<ValueChanges<T, UserTypes>>(root, rootFormValueChanges);
+  const beforeUserChange = getRootBeforeUserChange$<T, UserTypes>(formGroup);
+  return computed(() => projectFormValueChanges(formGroup, root, changes(), beforeUserChange()));
+}
+
+export function getRootFormInitialValue<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes,
+  R extends { [K in keyof R]: AbstractControl<any, any> } = T
+>(formGroup: FormGroup<T>): FormValue<R, UserTypes> {
   return (formGroup.root as any)[rootFormInitialValue];
 }
 
-export function getFormInitialValue<T extends { [K in keyof T]: AbstractControl<any, any>; }, UserTypes>(formGroup: FormGroup<T>): FormValue<T, UserTypes> {
-  const path: string[] | null = getFormPath(formGroup);
-  const rootInitialValue = getRootFormInitialValue<T, UserTypes>(formGroup);
-  if (!path) {
-    return rootInitialValue;
+export function getFormInitialValue<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes
+>(formGroup: FormGroup<T>): FormValue<T, UserTypes> {
+  const root = formGroup.root;
+  if (formGroup === root) {
+    return (root as any)[rootFormInitialValue];
   }
-  return getNestedValue(rootInitialValue, path);
+  return (initialGroups.get(root)?.get(formGroup) ?? {}) as FormValue<T, UserTypes>;
 }
 
+function projectFormValueChanges<
+  T extends { [K in keyof T]: AbstractControl<any, any> },
+  UserTypes
+>(
+  formGroup: FormGroup<T>,
+  root: AbstractControl,
+  rootValueChanges: ValueChanges<T, UserTypes> | undefined,
+  rootBeforeUserChange: ValueChanges<T, UserTypes> | undefined
+): (ValueChanges<T, UserTypes> & {
+  beforeUserChange?: FormValues<T, UserTypes>
+}) | undefined {
+  if (!rootValueChanges) {
+    return undefined;
+  }
+  if (formGroup === root) {
+    return {
+      ...rootValueChanges,
+      beforeUserChange: rootBeforeUserChange?.previous
+    };
+  }
+
+  const current = snapshotGroups.get(rootValueChanges.current)?.get(formGroup);
+  if (!current) {
+    return undefined;
+  }
+
+  const previous = snapshotGroups.get(rootValueChanges.previous)?.get(formGroup);
+  const baseline = rootBeforeUserChange
+    ? snapshotGroups.get(rootBeforeUserChange.previous)?.get(formGroup)
+    : undefined;
+
+  return {
+    ...rootValueChanges,
+    beforeUserChange: baseline,
+    // Deliberately preserve old fallback semantics for API compatibility.
+    previous: previous ?? { rawValue: {}, value: {} },
+    current
+  } as ValueChanges<T, UserTypes> & {
+    beforeUserChange?: FormValues<T, UserTypes>
+  };
+}
+
+/** One signal per control/symbol, shared by getters and setters. */
+function ensureSignal<T>(control: AbstractControl, key: symbol): WritableSignal<T | undefined> {
+  const storage = control as unknown as Record<symbol, unknown>;
+  const existing = storage[key];
+  if (isSignal(existing)) {
+    return existing as WritableSignal<T | undefined>;
+  }
+  const created = signal<T | undefined>(undefined);
+  storage[key] = created;
+  return created;
+}
 
 /**
- * helpers
+ * Index a newly captured state. Use raw array indices, so disabled entries do
+ * not shift identities. A nested FormGroup's own `.value` is authoritative.
  */
+function indexCurrentGroups(
+  root: FormGroup,
+  rawValue: unknown,
+  rootValue: unknown
+): GroupValuesIndex {
+  const groups: GroupValuesIndex = new WeakMap();
 
-function ensureSignal<W extends T[R], T extends object = any, R extends keyof T = any>(obj: T, key: R | symbol): WritableSignal<W> {
-  if (obj && key && !isSignal(obj[key as unknown as R])) {
-    obj[key as unknown as R] = signal(obj[key as unknown as R]) as W;
-  }
-  return obj[key as unknown as R] as WritableSignal<W>;
-}
-
-function getFormPath(control: AbstractControl): string[] | null {
-  const root: AbstractControl<any, any> = control.root;
-  if (root === control) {
-    return null;
-  }
-
-  const path: string[] = [];
-
-  function search(current: AbstractControl, currentPath: string[]): boolean {
-    if (current === control) {
-      path.push(...currentPath);
-      return true;
+  function visit(control: AbstractControl, raw: any): void {
+    if (raw === undefined || raw === null) {
+      return;
     }
-
-    if (current instanceof FormGroup) {
-      for (const key of Object.keys(current.controls)) {
-        const child = current.controls[key];
-        if (search(child, [...currentPath, key])) {
-          return true;
+    if (control instanceof FormGroup) {
+      groups.set(control, {
+        rawValue: raw,
+        value: (control === root ? rootValue : control.value) as GroupValues['value']
+      });
+      for (const key of Object.keys(control.controls)) {
+        const child = control.controls[key];
+        if (!(child instanceof FormControl)) {
+          visit(child, raw[key]);
+        }
+      }
+    } else if (control instanceof FormArray) {
+      for (let index = 0; index < control.length; index++) {
+        const child = control.at(index);
+        if (!(child instanceof FormControl)) {
+          visit(child, raw[index]);
         }
       }
     }
+  }
 
-    if (current instanceof FormArray) {
-      for (let i = 0; i < current.length; i++) {
-        const child = current.at(i);
-        if (search(child, [...currentPath, i.toString()])) {
-          return true;
+  visit(root, rawValue);
+  return groups;
+}
+
+/**
+ * Index supplied initial values, which may not match the current controls'
+ * values. Do not call `.value` here.
+ */
+function indexInitialGroups(root: AbstractControl, rawValue: unknown): InitialValuesIndex {
+  const groups: InitialValuesIndex = new WeakMap();
+
+  function visit(control: AbstractControl, raw: any): void {
+    if (raw === undefined || raw === null) {
+      return;
+    }
+    if (control instanceof FormGroup) {
+      groups.set(control, raw);
+      for (const key of Object.keys(control.controls)) {
+        const child = control.controls[key];
+        if (!(child instanceof FormControl)) {
+          visit(child, raw[key]);
+        }
+      }
+    } else if (control instanceof FormArray) {
+      for (let index = 0; index < control.length; index++) {
+        const child = control.at(index);
+        if (!(child instanceof FormControl)) {
+          visit(child, raw[index]);
         }
       }
     }
-
-    return false;
   }
 
-  return search(root, []) ? path : null;
+  visit(root, rawValue);
+  return groups;
 }
-
-export function getNestedValue(obj: any, path: string[], fallbackToEmptyObject: boolean = true): any {
-  return path.reduce((acc, key) => (acc && key in acc ? acc[key] : null), obj) ?? (fallbackToEmptyObject ? {} : undefined);
-}
-
-
-
-/**
- * Symbols
- */
-const rootFormValueChanges: unique symbol = Symbol('rootFormValueChanges');
-const rootFormInitialValue: unique symbol = Symbol('rootFormInitialValue');
