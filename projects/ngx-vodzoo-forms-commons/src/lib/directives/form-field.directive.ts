@@ -315,7 +315,9 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 
   private setInitial(control: AbstractControl<T>): void {
     if (!this.formControlName$()) {
-      this._formControlName$.set(getControlName(control));
+      const name: string = getControlName(control) || 'standalone';
+      setName(control, name);
+      this._formControlName$.set(name);
       this._value$.set(control.value);
       this._baseFormControl$.set(control);
       this._baseFormControlReady$.next(control);
@@ -376,6 +378,7 @@ export class FormFieldDirective<T> implements ControlValueAccessor, Validator, O
 export const uiChange: unique symbol = Symbol('uiChange');
 export const resetChange: unique symbol = Symbol('resetChange');
 export const controlLabel: unique symbol = Symbol('controlLabel');
+export const controlName: unique symbol = Symbol('controlName');
 export const DEFAULT_FORM_FIELD_CONFIG: FormFieldConfig<any> = {
   enableTouchOnInitialError: (control) => {
     if (Array.isArray(control.value)) {
@@ -408,6 +411,19 @@ function setLabel(control?: AbstractControl, label?: string): void {
 
 export function getLabel(control?: AbstractControl): string {
   return (control as any)?.[controlLabel] ?? '';
+}
+
+/**
+ * Form field controlName functions
+ */
+function setName(control?: AbstractControl, name?: string): void {
+  if (control && name) {
+    (control as any)[controlName] = name;
+  }
+}
+
+export function getName(control?: AbstractControl): string {
+  return (control as any)?.[controlName] ?? '';
 }
 
 

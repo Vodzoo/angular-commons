@@ -18,7 +18,8 @@ import {
   Provider,
   Signal,
   signal,
-  Type, untracked,
+  Type,
+  untracked,
   WritableSignal
 } from '@angular/core';
 import {
@@ -46,6 +47,7 @@ import {
 import {takeUntilDestroyed} from "@angular/core/rxjs-interop";
 import {
   getLabel,
+  getName,
   isDataChangedByUi,
   markAsResetChange,
   markAsUiChange,
@@ -188,7 +190,7 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
    * @deprecated use invalidControls instead
    */
   public invalidFields: OutputEmitterRef<string[]> = output();
-  public invalidControls: OutputEmitterRef<{control: FormControl; label: string}[]> = output();
+  public invalidControls: OutputEmitterRef<{control: FormControl; controlName: string; label: string;}[]> = output();
   public eventEmitted: OutputEmitterRef<FormEvent<any, string, any>> = output(); // root form only
 
 
@@ -433,7 +435,8 @@ export class FormDirective<T extends { [K in keyof T]: AbstractControl }, UserCo
           const invalidControls: AbstractControl[] = this.findInvalidControls(this.form$());
           return invalidControls.map(control => ({
             control: control as FormControl,
-            label: getLabel(control)
+            controlName: getName(control),
+            label: getLabel(control),
           }))
         }),
         tap(value => this.invalidControls.emit(value)),
