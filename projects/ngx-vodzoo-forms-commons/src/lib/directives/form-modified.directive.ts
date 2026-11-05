@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import {FORM_SERVICE_CONFIG, FormServiceConfig, STORAGE} from "../services/form.service";
 import {FormDirective, FormRawValue} from "./form.directive";
-import {AbstractControl} from "@angular/forms";
+import {AbstractControl, FormControl} from "@angular/forms";
 import {getFormValueChanges$} from "../formValues";
 import {methodSignal} from "../signals/method-signal";
 import {getRootBeforeUserChange$, setFormModified} from "../formModified";
@@ -36,6 +36,8 @@ export interface FormModifiedDiffEntry {
   pathString: string; // TODO use Paths?
   previousValue: any;
   currentValue: any;
+  /** Control state when the diff was calculated; undefined if no control was found. */
+  disabled?: boolean;
 }
 
 export interface GetDiffParams {
@@ -44,6 +46,7 @@ export interface GetDiffParams {
   equalFn: FormModifiedEqualFn;
   valueSelectorFn?: ValueSelectorFn;
   path?: (string | number)[];
+  form?: AbstractControl;
 }
 
 export const DEFAULT_FORM_MODIFIED_CONFIG: FormModifiedConfig = {
@@ -141,6 +144,7 @@ export class FormModifiedDirective<T extends { [K in keyof T]: AbstractControl }
           current,
           equalFn,
           valueSelectorFn: methodParams.valueSelectorFn,
+          form: this.formDirective.form$(),
         }
       );
     }
@@ -176,6 +180,7 @@ export function getDiff({
                           current,
                           equalFn,
                           valueSelectorFn,
+                          form,
                           path = []
                         }: GetDiffParams): FormModifiedDiffEntry[] {
 
@@ -194,7 +199,8 @@ export function getDiff({
         path,
         pathString: path.join('.'),
         previousValue: previous,
-        currentValue: current
+        currentValue: current,
+        disabled: getDiffDisabled(form, path),
       });
     }
     return changes;
@@ -220,10 +226,23 @@ export function getDiff({
         current: current?.[key],
         equalFn,
         valueSelectorFn,
+        form,
         path: nextPath
       })
     );
   }
 
   return changes;
+}
+
+function getDiffDisabled(form: AbstractControl | undefined, path: (string | number)[]): boolean | undefined {
+  if (!form) return undefined;
+
+  let control: AbstractControl | null = form;
+  for (const segment of path) {
+    // Remaining path segments can belong to the value of a single FormControl.
+    if (!control || control instanceof FormControl) break;
+    control = control.get([segment]);
+  }
+  return control?.disabled;
 }
