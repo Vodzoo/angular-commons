@@ -1,7 +1,7 @@
 ﻿import {Signal, signal} from '@angular/core';
 import {of} from 'rxjs';
 import {describe, expectTypeOf, it} from 'vitest';
-import {methodSignalMerge, type MethodSignalMergeArgs} from '../../public-api';
+import {methodSignalMerge, type MethodSignalMergeArgs, type MethodSignalMergeErrorFn} from '../../public-api';
 
 // tsc checks these calls without executing them outside an injection context.
 function infersEmittedValuesAndResults(): void {
@@ -13,6 +13,12 @@ function infersEmittedValuesAndResults(): void {
       expectTypeOf(methodParams).toEqualTypeOf<string | number>();
       expectTypeOf(previousMethodParams).toEqualTypeOf<string | number | null | undefined>();
       return typeof methodParams === 'string' ? methodParams.length : methodParams;
+    },
+    onError: (error, {methodParams, previousMethodParams, previousMethodValue}) => {
+      expectTypeOf(methodParams).toEqualTypeOf<string | number>();
+      expectTypeOf(previousMethodParams).toEqualTypeOf<string | number | null | undefined>();
+      // Like computation, history needs explicit generics to narrow P.
+      expectTypeOf(previousMethodValue).toBeUnknown();
     },
   });
   expectTypeOf(result).toEqualTypeOf<Signal<number | undefined>>();
@@ -65,6 +71,11 @@ function acceptsExplicitTypesAndHistory(): void {
       expectTypeOf(previousMethodValue).toEqualTypeOf<CachedResult | undefined>();
       return {id: String(methodParams)};
     },
+    onError: (error, {methodParams, previousMethodParams, previousMethodValue}) => {
+      expectTypeOf(methodParams).toEqualTypeOf<string | number>();
+      expectTypeOf(previousMethodParams).toEqualTypeOf<string | number | undefined>();
+      expectTypeOf(previousMethodValue).toEqualTypeOf<CachedResult | undefined>();
+    },
   };
   expectTypeOf(methodSignalMerge(args)).toEqualTypeOf<Signal<Result | undefined>>();
   methodSignalMerge<[string, number], Result, CachedResult>(args);
@@ -77,6 +88,16 @@ function acceptsExplicitTypesAndHistory(): void {
     },
   });
   expectTypeOf(result).toEqualTypeOf<Signal<string | undefined>>();
+}
+
+function acceptsErrorOnlyHandlersWithoutTypeArguments(): void {
+  const onError: MethodSignalMergeErrorFn = error => {};
+  const result = methodSignalMerge<[string], number>({
+    params: [signal('A')],
+    computation: ({methodParams}) => methodParams.length,
+    onError,
+  });
+  expectTypeOf(result).toEqualTypeOf<Signal<number | undefined>>();
 }
 
 function rejectsInvalidArgumentsAndTriggerMetadata(): void {
@@ -105,6 +126,7 @@ describe('methodSignalMerge types', () => {
     expectTypeOf(infersEmittedValuesAndResults).toEqualTypeOf<() => void>();
     expectTypeOf(acceptsReadonlyTuplesAndSignalArrays).toEqualTypeOf<() => void>();
     expectTypeOf(acceptsExplicitTypesAndHistory).toEqualTypeOf<() => void>();
+    expectTypeOf(acceptsErrorOnlyHandlersWithoutTypeArguments).toEqualTypeOf<() => void>();
     expectTypeOf(rejectsInvalidArgumentsAndTriggerMetadata).toEqualTypeOf<() => void>();
   });
 });

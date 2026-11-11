@@ -25,13 +25,13 @@ export function methodSignalMerge<T extends readonly unknown[], R, P extends R =
           comp = args.computation({methodParams, previousMethodParams, previousMethodValue});
         } catch (error) {
           console.error(error);
-          args.onError?.(error);
+          args.onError?.(error, {methodParams, previousMethodParams, previousMethodValue});
           return EMPTY;
         }
         const result$: Observable<R> = isObservable(comp) ? comp.pipe(
           catchError(error => {
             console.error(error);
-            args.onError?.(error);
+            args.onError?.(error, {methodParams, previousMethodParams, previousMethodValue});
             return EMPTY;
           }),
         ) : of(comp);
@@ -53,11 +53,12 @@ function isNonNullable<T>(obj: T): obj is NonNullable<T> {
 export interface MethodSignalMergeArgs<T extends readonly unknown[], R, P extends R = R> {
   params: {[K in keyof T]: Signal<T[K]>};
   computation: MethodSignalMergeComputationFn<T, R, P>;
-  onError?: MethodSignalMergeErrorFn;
+  /** Receives the triggering params and history as of the error, including results already emitted by this computation. */
+  onError?: MethodSignalMergeErrorFn<T, P>;
 }
 
 export type MethodSignalMergeComputationFn<T extends readonly unknown[], R, P extends R = R> = (args: MethodSignalMergeComputationFnArgs<T, P>) => Observable<R> | R;
-export type MethodSignalMergeErrorFn = (error: any) => void;
+export type MethodSignalMergeErrorFn<T extends readonly unknown[] = readonly unknown[], R = unknown> = (error: any, args: MethodSignalMergeComputationFnArgs<T, R>) => void;
 
 export interface MethodSignalMergeComputationFnArgs<T extends readonly unknown[], R> {
   methodParams: NonNullable<T[number]>;

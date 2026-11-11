@@ -286,7 +286,11 @@ describe('methodSignalMerge', () => {
       expect(onError).toHaveBeenCalledTimes(failure === 'empty' ? 0 : 1);
       if (failure !== 'empty') {
         expect(logged).toHaveBeenCalledWith(error);
-        expect(onError).toHaveBeenCalledWith(error);
+        expect(onError).toHaveBeenCalledWith(error, {
+          methodParams: 'failure',
+          previousMethodParams: failure === 'error after emission' ? 'failure' : 'A',
+          previousMethodValue: failure === 'error after emission' ? 'partial' : 'result A',
+        });
       }
 
       action.set('B');
@@ -299,6 +303,36 @@ describe('methodSignalMerge', () => {
       });
     },
   );
+
+  it.each([false, true])('reports the active emission when another source changes before an async error (partial result: %s)', partial => {
+    const first = signal('A');
+    const second = signal<string | undefined>(undefined);
+    const request = new Subject<string>();
+    const error = new Error('request failed');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onError = vi.fn();
+    const result = TestBed.runInInjectionContext(() => methodSignalMerge({
+      params: [first, second],
+      computation: ({methodParams}) => methodParams === 'B' ? request : `result ${methodParams}`,
+      onError,
+    }));
+    TestBed.flushEffects();
+    second.set('B');
+    TestBed.flushEffects();
+    if (partial) request.next('partial B');
+
+    first.set('C');
+    request.error(error);
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(error, {
+      methodParams: 'B',
+      previousMethodParams: partial ? 'B' : 'A',
+      previousMethodValue: partial ? 'partial B' : 'result A',
+    });
+    expect(result()).toBe(partial ? 'partial B' : 'result A');
+    TestBed.flushEffects();
+    expect(result()).toBe('result C');
+  });
 
   it.each(['sync', 'observable'] as const)('logs and recovers from a %s error without onError', failure => {
     const source = signal('A');
@@ -400,7 +434,9 @@ describe('methodSignalMerge', () => {
     TestBed.flushEffects();
     expect(subscribed).toHaveBeenCalledTimes(1);
     expect(logged).toHaveBeenCalledExactlyOnceWith(error);
-    expect(onError).toHaveBeenCalledExactlyOnceWith(error);
+    expect(onError).toHaveBeenCalledExactlyOnceWith(error, {
+      methodParams: 'failure', previousMethodParams: 'A', previousMethodValue: 'A',
+    });
     expect(result()).toBe('A');
 
     source.set('B');
@@ -491,6 +527,9 @@ describe('methodSignalMerge', () => {
     expect(logged.mock.calls[0][0]).toBe(payload);
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0][0]).toBe(payload);
+    expect(onError.mock.calls[0][1]).toEqual({
+      methodParams: 'failure', previousMethodParams: undefined, previousMethodValue: undefined,
+    });
     source.set('recovered');
     TestBed.flushEffects();
     expect(result()).toBe('recovered');

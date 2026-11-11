@@ -1,5 +1,5 @@
 import {Signal} from "@angular/core";
-import { catchError, EMPTY, filter, isObservable, Observable, of, switchMap, tap } from "rxjs";
+import {catchError, EMPTY, filter, isObservable, Observable, of, switchMap, tap} from "rxjs";
 import {toObservable, toSignal} from "@angular/core/rxjs-interop";
 
 export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R, P>): Signal<R | undefined> {
@@ -15,13 +15,13 @@ export function methodSignal<T, R, P extends R = R>(args: MethodSignalArgs<T, R,
             comp = args.computation({methodParams, previousMethodParams, previousMethodValue});
           } catch (error) {
             console.error(error);
-            args.onError?.(error);
+            args.onError?.(error, {methodParams, previousMethodParams, previousMethodValue});
             return EMPTY;
           }
           const result$: Observable<R> = isObservable(comp) ? comp.pipe(
             catchError((error) => {
               console.error(error);
-              args.onError?.(error);
+              args.onError?.(error, {methodParams, previousMethodParams, previousMethodValue});
               return EMPTY;
             }),
           ) : of(comp);
@@ -43,14 +43,15 @@ export function isNonNullable<T>(obj: T): obj is NonNullable<T> {
 export interface MethodSignalArgs<T, R, P extends R = R> {
   params: Signal<T>;
   computation: MethodSignalComputationFn<T, R, P>;
-  onError?: MethodSignalErrorFn;
+  /** Receives the triggering params and history as of the error, including results already emitted by this computation. */
+  onError?: MethodSignalErrorFn<T, P>;
 }
 
 export type MethodSignalComputationFn<T, R, P extends R = R> = (args: MethodSignalComputationFnArgs<T, P>) => Observable<R> | R;
-export type MethodSignalErrorFn = (error: any) => void;
+export type MethodSignalErrorFn<T = unknown, R = unknown> = (error: any, args: MethodSignalComputationFnArgs<T, R>) => void;
 
 export interface MethodSignalComputationFnArgs<T, R> {
-  methodParams: NonNullable<T>,
-  previousMethodParams?: T,
-  previousMethodValue?: R,
+  methodParams: NonNullable<T>;
+  previousMethodParams?: T;
+  previousMethodValue?: R;
 }
