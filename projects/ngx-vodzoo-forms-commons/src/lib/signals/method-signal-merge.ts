@@ -52,10 +52,15 @@ function isNonNullable<T>(obj: T): obj is NonNullable<T> {
 
 export interface MethodSignalMergeArgs<T extends readonly unknown[], R, P extends R = R> {
   params: {[K in keyof T]: Signal<T[K]>};
-  computation: (args: {
-    methodParams: NonNullable<T[number]>;
-    previousMethodParams?: T[number];
-    previousMethodValue?: P;
-  }) => Observable<R> | R;
-  onError?: (error: any) => void;
+  computation: MethodSignalMergeComputationFn<T, R, P>;
+  onError?: MethodSignalMergeErrorFn;
+}
+
+export type MethodSignalMergeComputationFn<T extends readonly unknown[], R, P extends R = R> = (args: MethodSignalMergeComputationFnArgs<T, P>) => Observable<R> | R;
+export type MethodSignalMergeErrorFn = (error: any) => void;
+
+export interface MethodSignalMergeComputationFnArgs<T extends readonly unknown[], R> {
+  methodParams: NonNullable<T[number]>;
+  previousMethodParams?: T[number];
+  previousMethodValue?: R;
 }

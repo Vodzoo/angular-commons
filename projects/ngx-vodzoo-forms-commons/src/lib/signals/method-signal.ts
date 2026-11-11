@@ -42,6 +42,15 @@ export function isNonNullable<T>(obj: T): obj is NonNullable<T> {
 
 export interface MethodSignalArgs<T, R, P extends R = R> {
   params: Signal<T>;
-  computation: (args: { methodParams: NonNullable<T>, previousMethodParams?: T, previousMethodValue?: P }) => Observable<R> | R;
-  onError?: (error: any) => void;
+  computation: MethodSignalComputationFn<T, R, P>;
+  onError?: MethodSignalErrorFn;
+}
+
+export type MethodSignalComputationFn<T, R, P extends R = R> = (args: MethodSignalComputationFnArgs<T, P>) => Observable<R> | R;
+export type MethodSignalErrorFn = (error: any) => void;
+
+export interface MethodSignalComputationFnArgs<T, R> {
+  methodParams: NonNullable<T>,
+  previousMethodParams?: T,
+  previousMethodValue?: R,
 }
