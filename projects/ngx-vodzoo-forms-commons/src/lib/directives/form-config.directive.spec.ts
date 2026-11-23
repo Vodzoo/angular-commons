@@ -10,6 +10,7 @@ import {
 } from './form-config.directive';
 import {FormDirective} from './form.directive';
 import {FormService} from '../services/form.service';
+import {switchDisable} from '../disableWithContext';
 
 @Component({
   standalone: true,
@@ -24,6 +25,7 @@ describe('FormConfigDirective', () => {
   let form: FormGroup<{
     first: FormControl<string>;
     second: FormControl<string>;
+    nested?: FormGroup<{derived: FormControl<string>}>;
   }>;
 
   beforeEach(() => {
@@ -93,6 +95,30 @@ describe('FormConfigDirective', () => {
     form.controls.first.setValue('second change');
     await vi.advanceTimersByTimeAsync(0);
     expect(execution.calls).toEqual({first: 1, second: 2});
+  });
+
+  it('reruns service logic after disabling a subgroup and settles after an idempotent patch', async () => {
+    vi.useFakeTimers({loopLimit: 20});
+    const derived = new FormControl('', {nonNullable: true});
+    const nested = new FormGroup({derived});
+    form.addControl('nested', nested, {emitEvent: false});
+    const observedStatuses: string[] = [];
+    const service = TestBed.inject(FormService);
+    vi.spyOn(service, 'getFormFieldsLogic').mockReturnValue({
+      first: ({onValueChange}) => onValueChange?.(() => {
+        observedStatuses.push(nested.status);
+        switchDisable(() => form.controls.first.value === 'lock', 'readOnly', nested);
+        derived.patchValue('derived');
+      })
+    });
+    directive.formControlsLogic = service.getFormFieldsLogic();
+
+    form.controls.first.setValue('lock');
+    await vi.runAllTimersAsync();
+
+    expect(observedStatuses).toEqual(['VALID', 'DISABLED']);
+    expect(nested.status).toBe('DISABLED');
+    expect(derived.value).toBe('derived');
   });
 
   it('pauses and resumes recalculation logic', () => {
